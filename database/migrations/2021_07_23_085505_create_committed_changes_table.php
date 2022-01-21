@@ -16,11 +16,11 @@ class CreateCommittedChangesTable extends Migration
         Schema::create('tbl_committed_changes', function (Blueprint $table) {
             $table->id();
             $table->timestamp('effective_from')->useCurrent();
-            $table->timestamp('effective_to')->default('294276-12-31 23:59:59.999999+00:00');
+            $table->timestamp('effective_to')->default('9999-12-31 23:59:59');
             $table->foreignId('user_id');
             $table->timestamps();
             $table->softDeletes();
-            
+
             $table->foreign('user_id')->references('id')->on('users')->onUpdate('cascade')->onDelete('restrict');
         });
     }

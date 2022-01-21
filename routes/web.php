@@ -23,16 +23,16 @@ use Illuminate\Support\Facades\Auth;
 */
 
 Route::get('/321123', function (InitialDataService $initialDataService) {
-    
+
     $nodeId = 4;
     $userId = 1;
-   
+
     $medicalInstitutions = MedicalInstitution::OrderBy('order')->get();
-    
-    
+
+
     foreach ($medicalInstitutions as $mo) {
         foreach (PlannedIndicator::all() as $pi) {
-            
+
             $dto = new InitialDataValueDto(
                     year: 2021,
                     moId: $mo->id,
@@ -40,11 +40,11 @@ Route::get('/321123', function (InitialDataService $initialDataService) {
                     value: 2021 + $mo->id + $pi->id,
                     userId: $userId
                 );
-                
+
             $initialDataService->setValue($dto);
         }
     }
-    
+
     return 'OK';
     /*
     $medicalInstitutions = MedicalInstitution::OrderBy('order')->get();
@@ -54,13 +54,13 @@ Route::get('/321123', function (InitialDataService $initialDataService) {
         $mo->save();
     }
     */
-    return 'OK'; 
-    
+    return 'OK';
+
     //phpinfo();
 });
 
 Route::get('/', function () {
-    
+    return 'OK12';
     $medicalInstitutions = MedicalInstitution::OrderBy('order')->get();
     foreach ($medicalInstitutions as $mo) {
         $mo->year_qty = 150;
@@ -74,15 +74,15 @@ Route::get('/', function () {
         $mo->Q4_qty = 40;
         $mo->Q4_sum = 1000000;
     }
-    
-    
+
+
     $pages = [
         ['id' => 1, 'name' => 'План'],
     ];
-    
 
 
-    
+
+
     return view('welcome', [
         'pages' => $pages,
         'medicalInstitutions' => $medicalInstitutions
@@ -90,13 +90,13 @@ Route::get('/', function () {
 });
 
 Route::get('/medicalInstitution/{id}/{period}', function ($id,$period) {
-    
+
     $medicalInstitution = MedicalInstitution::find($id);
-    
+
     $pages = [
         ['id' => 1, 'name' => 'План'],
     ];
-    
+
     switch ($period) {
         case 'year':
             $period = 'Год';
@@ -116,14 +116,14 @@ Route::get('/medicalInstitution/{id}/{period}', function ($id,$period) {
         default:
            $period = '';
     }
-    
-    
-    
+
+
+
     return view('medical-institution-period', [
         'pages' => $pages,
         'medicalInstitution' => $medicalInstitution,
         'period' => $period
-    
+
     ]);
 })->name('medicalInstitutionPeriod');
 
@@ -131,17 +131,17 @@ Route::get('/medicalInstitution/{id}', function ($id) {
     $pages = [
         ['id' => 1, 'name' => 'План'],
     ];
-    
+
      $medicalInstitution = MedicalInstitution::find($id);
-    
+
     return view('medical-institution', [
         'pages' => $pages,
         'medicalInstitution' => $medicalInstitution
-    
+
     ]);
 })->name('medicalInstitution');
 
 Route::get('/page/{id}', function ($id) {
-    
+
     return redirect('/');
 })->name('page');

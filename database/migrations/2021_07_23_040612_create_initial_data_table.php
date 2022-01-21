@@ -18,11 +18,11 @@ class CreateInitialDataTable extends Migration
             $table->string('name',128)->unique();;
             $table->string('description')->nullable();
             $table->timestamp('effective_from')->useCurrent();
-            $table->timestamp('effective_to')->default('294276-12-31 23:59:59.999999+00:00');
+            $table->timestamp('effective_to')->default('9999-12-31 23:59:59');
             $table->timestamps();
             $table->softDeletes();
         });
-        
+
         Schema::create('tbl_initial_data', function (Blueprint $table) {
             $table->id();
             $table->year('year');
@@ -43,7 +43,7 @@ class CreateInitialDataTable extends Migration
                    ->constrained('users')
                    ->onUpdate('cascade')
                    ->onDelete('restrict');
-            $table->timestamp('processed_at')->nullable(); 
+            $table->timestamp('processed_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

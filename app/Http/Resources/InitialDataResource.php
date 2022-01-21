@@ -18,6 +18,7 @@ class InitialDataResource extends JsonResource
             'id'    => $this->id,
             'year'  => $this->year,
             'mo_id' => $this->moId,
+            //'mo_department_id' => $this->moDepartmentId,
             'planned_indicator_id' => $this->plannedIndicatorId,
             'value' => rtrim(rtrim($this->value,'0'),'.'),
             'user_id' => $this->userId,

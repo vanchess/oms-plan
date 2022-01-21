@@ -31,7 +31,7 @@ class InitialDataController extends Controller
         }
         $nodeId = (int)$request->node;
         $year = (int)$request->year;
-        
+
         $data = $initialDataService->getByNodeIdAndYear($nodeId, $year);
         //var_dump($data[0]);
         //return $data;
@@ -49,35 +49,42 @@ class InitialDataController extends Controller
     {
         $user = Auth::user();
         $userId = $user->id;
-        
+
         $validator = Validator::make($request->all(), [
             'year' => 'required|integer|min:2020|max:2099',
             'moId' => 'required|integer',
+            'moDepartmentId' => 'integer',
             'plannedIndicatorId' => 'required|integer',
             'value' => ['required', new BCMathString],
         ]);
         if ($validator->fails()) {
             return response()->json($validator->errors()->toJson(), 400);
         }
-        
+
         $validated = $validator->validated();
+        //$departmentId = null;
+        //if(isset($validated['moDepartmentId'])) {
+        //    $departmentId = (int)$validated['moDepartmentId'];
+        //}
         $dto = new InitialDataValueDto(
+            //id: null,
             year: (int)$validated['year'],
             moId: (int)$validated['moId'],
+            //moDepartmentId: $departmentId,
             plannedIndicatorId: (int)$validated['plannedIndicatorId'],
             value: (string)$validated['value'],
             userId: $userId
         );
-        
+
         return new InitialDataResource($initialDataService->setValue($dto)->value);
-        // 
+        //
         /*
         $initialData = new InitialData();
         $initialData->year = $request->year;
         $initialData->mo_id = $request->mo;
         $initialData->planned_indicator_id = ;
         $initialData->value = $request->value;
-        $initialData->algorithm_id = 
+        $initialData->algorithm_id =
         $initialData->user_id = $userId;
         */
     }
