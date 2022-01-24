@@ -62,15 +62,14 @@ class InitialDataController extends Controller
         }
 
         $validated = $validator->validated();
-        //$departmentId = null;
-        //if(isset($validated['moDepartmentId'])) {
-        //    $departmentId = (int)$validated['moDepartmentId'];
-        //}
+        $departmentId = null;
+        if(isset($validated['moDepartmentId'])) {
+            $departmentId = (int)$validated['moDepartmentId'];
+        }
         $dto = new InitialDataValueDto(
-            //id: null,
             year: (int)$validated['year'],
             moId: (int)$validated['moId'],
-            //moDepartmentId: $departmentId,
+            moDepartmentId: $departmentId,
             plannedIndicatorId: (int)$validated['plannedIndicatorId'],
             value: (string)$validated['value'],
             userId: $userId
