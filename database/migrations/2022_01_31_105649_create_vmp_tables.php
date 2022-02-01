@@ -16,7 +16,7 @@ class CreateVmpTables extends Migration
         Schema::create('tbl_care_profiles', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('mz_code');
+            $table->string('mz_code')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
@@ -24,7 +24,7 @@ class CreateVmpTables extends Migration
         Schema::create('tbl_care_profiles_foms', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->foreignId('care_profile_id');
+            $table->foreignId('care_profile_id')->nullable();
             $table->foreign('care_profile_id')->references('id')->on('tbl_care_profiles')->onUpdate('cascade')->onDelete('restrict');
             $table->string('code_v002');
             $table->timestamp('effective_from')->useCurrent();
@@ -36,7 +36,7 @@ class CreateVmpTables extends Migration
         Schema::create('tbl_vmp_methods', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('mz_code');
+            $table->string('mz_code')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
@@ -51,7 +51,7 @@ class CreateVmpTables extends Migration
         Schema::create('tbl_vmp_types', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('mz_code');
+            $table->string('mz_code')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
@@ -82,6 +82,11 @@ class CreateVmpTables extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('');
+        Schema::dropIfExists('tbl_vmp_details');
+        Schema::dropIfExists('tbl_vmp_types');
+        Schema::dropIfExists('tbl_vmp_groups');
+        Schema::dropIfExists('tbl_vmp_methods');
+        Schema::dropIfExists('tbl_care_profiles_foms');
+        Schema::dropIfExists('tbl_care_profiles');
     }
 }
