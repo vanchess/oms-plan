@@ -40,7 +40,7 @@ class InitialDataService
                 id: $e->id,
                 year: $e->year,
                 moId: $e->mo_id,
-                //moDepartmentId: $e->mo_department_id,
+                moDepartmentId: $e->mo_department_id,
                 plannedIndicatorId: $e->planned_indicator_id,
                 value: $e->value,
                 userId: $e->user_id
@@ -78,6 +78,7 @@ class InitialDataService
         $initialData->value = $dto->value;
         $initialData->algorithm_id = $algorithmId;
         $initialData->user_id = $dto->userId;
+        $initialData->mo_department_id = $dto->moDepartmentId;
         $initialData->save();
 
         $value = new InitialDataValueDto(
@@ -85,6 +86,7 @@ class InitialDataService
             year: $initialData->year,
             moId: $initialData->mo_id,
             plannedIndicatorId: $initialData->planned_indicator_id,
+            moDepartmentId: $initialData->mo_department_id,
             value: $initialData->value,
             userId: $initialData->user_id
         );
