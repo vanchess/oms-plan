@@ -15,18 +15,18 @@ class CreateVmpTables extends Migration
     {
         Schema::create('tbl_care_profiles', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('mz_code')->nullable();
+            $table->string('name',512);
+            $table->string('mz_code',64)->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
 
         Schema::create('tbl_care_profiles_foms', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('name', 512);
             $table->foreignId('care_profile_id')->nullable();
             $table->foreign('care_profile_id')->references('id')->on('tbl_care_profiles')->onUpdate('cascade')->onDelete('restrict');
-            $table->string('code_v002');
+            $table->string('code_v002',64);
             $table->timestamp('effective_from')->useCurrent();
             $table->timestamp('effective_to')->default('9999-12-31 23:59:59');
             $table->timestamps();
@@ -35,23 +35,23 @@ class CreateVmpTables extends Migration
 
         Schema::create('tbl_vmp_methods', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('mz_code')->nullable();
+            $table->string('name', 512);
+            $table->string('mz_code', 64)->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
 
         Schema::create('tbl_vmp_groups', function (Blueprint $table) {
             $table->id();
-            $table->string('code');
+            $table->string('code', 64);
             $table->timestamps();
             $table->softDeletes();
         });
 
         Schema::create('tbl_vmp_types', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('mz_code')->nullable();
+            $table->string('name', 512);
+            $table->string('mz_code', 64)->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
