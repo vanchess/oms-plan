@@ -35,7 +35,7 @@ class CreateVmpTables extends Migration
 
         Schema::create('tbl_vmp_methods', function (Blueprint $table) {
             $table->id();
-            $table->string('name', 512);
+            $table->string('name', 1024);
             $table->string('mz_code', 64)->nullable();
             $table->timestamps();
             $table->softDeletes();
