@@ -60,8 +60,8 @@ class CreateVmpTables extends Migration
             $table->id();
             $table->foreignId('care_profile_id');
             $table->foreign('care_profile_id')->references('id')->on('tbl_care_profiles')->onUpdate('cascade')->onDelete('restrict');
-            $table->foreignId('groupe_id');
-            $table->foreign('groupe_id')->references('id')->on('tbl_vmp_groups')->onUpdate('cascade')->onDelete('restrict');
+            $table->foreignId('group_id');
+            $table->foreign('group_id')->references('id')->on('tbl_vmp_groups')->onUpdate('cascade')->onDelete('restrict');
             $table->foreignId('method_id');
             $table->foreign('method_id')->references('id')->on('tbl_vmp_methods')->onUpdate('cascade')->onDelete('restrict');
             $table->foreignId('type_id');
