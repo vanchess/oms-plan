@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CareProfilesController;
 use App\Http\Controllers\MedicalInstitutionController;
 use App\Http\Controllers\MedicalInstitutionDepartmentController;
 use App\Http\Controllers\MedicalInstitutionIdsController;
@@ -17,6 +18,11 @@ use App\Http\Controllers\UsedMedicalServicesController;
 use App\Http\Controllers\IndicatorsController;
 use App\Http\Controllers\InitialDataController;
 use App\Http\Controllers\PlannedIndicatorController;
+use App\Http\Controllers\UsedCareProfilesController;
+use App\Http\Controllers\VmpGroupController;
+use App\Http\Controllers\VmpTypesController;
+use App\Models\VmpGroup;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -34,8 +40,8 @@ Route::group(array('prefix' => 'v1'), function()
         Route::get('user', function (Request $request) {
             return $request->user();
         });
-        
-        
+
+
         Route::apiResource('medical-institution', MedicalInstitutionController::class);
         Route::apiResource('medical-institution-department', MedicalInstitutionDepartmentController::class);
         Route::get('/medical-institution-ids/having-departments', [MedicalInstitutionIdsController::class, 'havingDepartments']);
@@ -48,14 +54,18 @@ Route::group(array('prefix' => 'v1'), function()
         Route::get('/used-hospital-bed-profiles', [UsedHospitalBedProfilesController::class, 'hospitalBedProfilesUsedForNodeId']);
         Route::get('/used-medical-assistance-types', [UsedMedicalAssistanceTypeController::class, 'medicalAssistanceTypesUsedForNodeId']);
         Route::get('/used-medical-services', [UsedMedicalServicesController::class, 'medicalServicesUsedForNodeId']);
+        Route::get('/user-care-profiles',[UsedCareProfilesController::class, 'careProfilesUsedForNodeId']);
         Route::apiResource('node-init-data', InitialDataController::class);
+        Route::apiResource('care-profiles', CareProfilesController::class);
+        Route::apiResource('vmp-types', VmpTypesController::class);
+        Route::apiResource('vmp-groups', VmpGroupController::class);
     });
-    
-    
+
+
     Route::get('/users', function (Request $request) {
         return $request->user();
     });
-    
+
     Route::group(['middleware' => 'api','prefix' => 'auth'], function ($router) {
         Route::post('/login', [AuthController::class, 'login'])->name('login');
         Route::post('/register', [AuthController::class, 'register']);

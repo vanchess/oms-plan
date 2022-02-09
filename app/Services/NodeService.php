@@ -29,7 +29,7 @@ class NodeService
         $usedId = PlannedIndicator::select('indicator_id')->where('node_id', $nodeId)->groupBy('indicator_id')->pluck('indicator_id');
         return Indicator::whereIn('id',$usedId)->orderBy('order')->pluck('id');
     }
-    
+
     /**
      * Возвращает массив id плановых показателей для переданного id узла дерева категорий
      * (плановый показатель = показатель,услуга,профиль,ФАП )
@@ -40,8 +40,8 @@ class NodeService
     {
         return PlannedIndicator::select('id')->where('node_id', $nodeId)->pluck('id');
     }
-    
-    
+
+
     /**
      * Возвращает массив id профилей коек для переданного id узла дерева категорий
      *
@@ -56,7 +56,18 @@ class NodeService
         sort($usedIds);
         return $usedIds;
     }
-    
+
+    public function careProfilesForNodeId(int $nodeId)
+    {
+        $usedIds = PlannedIndicator::select('care_profile_id')->where('node_id', $nodeId)->whereNotNull('care_profile_id')->groupBy('care_profile_id')->pluck('care_profile_id')->toArray();
+
+        if(count($usedIds) === 0) {
+            return [];
+        }
+        sort($usedIds);
+        return $usedIds;
+    }
+
     public function medicalAssistanceTypesForNodeId(int $nodeId)
     {
         $column = 'assistance_type_id';
@@ -67,7 +78,7 @@ class NodeService
         sort($usedIds);
         return $usedIds;
     }
-    
+
     public function medicalServicesForNodeId(int $nodeId)
     {
         $column = 'service_id';

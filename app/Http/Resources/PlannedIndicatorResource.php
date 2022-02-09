@@ -21,7 +21,9 @@ class PlannedIndicatorResource extends JsonResource
             'service_id' => $this->service_id,
             'profile_id' => $this->profile_id,
             'assistance_type_id' => $this->assistance_type_id,
-            'fap_id' => $this->fap_id,
+            'care_profile_id' => $this->care_profile_id,
+            'vmp_group_id' => $this->vmp_group_id,
+            'vmp_type_id' => $this->vmp_type_id
         ];
     }
 }

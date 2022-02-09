@@ -6,10 +6,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class HospitalBedProfiles extends Model
+class VmpGroup extends Model
 {
     use SoftDeletes;
 
     protected $dates = ['deleted_at'];
-    protected $table = 'tbl_hospital_bed_profiles';
+    protected $table = 'tbl_vmp_groups';
 }
