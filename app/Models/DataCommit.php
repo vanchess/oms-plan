@@ -2,13 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+// use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class MedicalServices extends Model
+class DataCommit extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'tbl_medical_services';
+    protected $table ='tbl_committed_changes';
 }

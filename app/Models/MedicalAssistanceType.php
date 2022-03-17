@@ -10,6 +10,5 @@ class MedicalAssistanceType extends Model
 {
     use SoftDeletes;
 
-    protected $dates = ['deleted_at'];
     protected $table = 'tbl_medical_assistance_types';
 }

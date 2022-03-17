@@ -3,12 +3,11 @@ declare(strict_types=1);
 
 namespace App\Services\Dto;
 
-use App\Services\Dto\InitialDataValueDto;
-
-class InitialDataValueQueryResultDto extends QueryResultDto
+class PlannedIndicatorChangeValueQueryResultDto extends QueryResultDto
 {
-    public function __construct(
-        public InitialDataValueDto $value,
+    public function __construct
+    (
+        public PlannedIndicatorChangeValueDto $value,
         string $operationMessage,
         bool $operationError = false,
         bool $hasValue = false

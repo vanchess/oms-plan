@@ -3,29 +3,22 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\InitialDataLoaded;
 use App\Models\InitialData;
 use App\Models\PlannedIndicator;
-use Illuminate\Http\Request;
-
-use App\Services\NodeService;
 
 use App\Exceptions\InitialDataIsFixedException;
 use App\Services\Dto\InitialDataValueDto;
 
 use App\Services\Dto\InitialDataValueQueryResultDto;
-//use App\Http\Resources\IndicatorCollection;
-//use App\Http\Resources\IndicatorResource;
-use Validator;
-use DB;
 
 class InitialDataService
 {
-    private $nodeService = null;
 
-    function __construct(NodeService $service) {
-        $this->nodeService = $service;
-    }
+    function __construct(
+        private NodeService $nodeService,
+        private InitialDataFixingService $initialDataFixingService,
+        private VolumeDistributionAlgorithmService $algorithm
+    ) { }
 
     public function getByNodeIdAndYear(int $nodeId, int $year) {
         $ids = $this->nodeService->plannedIndicatorsForNodeId($nodeId);
@@ -46,13 +39,9 @@ class InitialDataService
                 userId: $e->user_id
             ));
         });
-        return $data->all();//->toArray();
+        return $data->all();//->toArray();//
     }
 
-    public function getAlgorithmId(int $indicatorId)
-    {
-        return 2;
-    }
     /**
      * Добавляет начальные данные в таблицу
      *
@@ -62,12 +51,11 @@ class InitialDataService
     {
         $plannedIndicator = PlannedIndicator::findOrFail($dto->plannedIndicatorId);
 
-        $algorithmId = $this->getAlgorithmId($plannedIndicator->indicator_id);
+        $algorithmId = $this->algorithm->getAlgorithmId($plannedIndicator->indicator_id);
 
         //DB::transaction(function() use ($dto) {
         // Проверяем, что данные доступны для редактирования.
-        $loaded = InitialDataLoaded::where('node_id',$plannedIndicator->nodeId)->first();
-        if ($loaded) {
+        if ($this->initialDataFixingService->fixed($plannedIndicator->node_id, $dto->year)) {
             throw new InitialDataIsFixedException('Начальные данные для данного раздела зафиксированны');
         }
 
@@ -100,5 +88,4 @@ class InitialDataService
 
         return $result;
     }
-
 }

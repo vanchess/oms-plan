@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\InitialChanges;
+use App\Jobs\InitialDataLoaded;
 use Illuminate\Support\Facades\Route;
 use App\Models\MedicalInstitution;
 use App\Models\Organization;
@@ -60,88 +62,9 @@ Route::get('/321123', function (InitialDataService $initialDataService) {
 });
 
 Route::get('/', function () {
+     InitialChanges::dispatch(2022);
+    // InitialDataLoaded::dispatch(2, 2022, 1);
+    // InitialDataLoaded::dispatch(9, 2022, 1);
+
     return 'OK12';
-    $medicalInstitutions = MedicalInstitution::OrderBy('order')->get();
-    foreach ($medicalInstitutions as $mo) {
-        $mo->year_qty = 150;
-        $mo->year_sum = 3500000;
-        $mo->Q1_qty = 40;
-        $mo->Q1_sum = 1000000;
-        $mo->Q2_qty = 30;
-        $mo->Q2_sum = 500000;
-        $mo->Q3_qty = 40;
-        $mo->Q3_sum = 1000000;
-        $mo->Q4_qty = 40;
-        $mo->Q4_sum = 1000000;
-    }
-
-
-    $pages = [
-        ['id' => 1, 'name' => 'План'],
-    ];
-
-
-
-
-    return view('welcome', [
-        'pages' => $pages,
-        'medicalInstitutions' => $medicalInstitutions
-    ]);
 });
-
-Route::get('/medicalInstitution/{id}/{period}', function ($id,$period) {
-
-    $medicalInstitution = MedicalInstitution::find($id);
-
-    $pages = [
-        ['id' => 1, 'name' => 'План'],
-    ];
-
-    switch ($period) {
-        case 'year':
-            $period = 'Год';
-            break;
-        case 'Q1':
-            $period = '1 квартал';
-            break;
-        case 'Q2':
-            $period = '2 квартал';
-            break;
-        case 'Q3':
-            $period = '3 квартал';
-            break;
-        case 'Q4':
-            $period = '4 квартал';
-            break;
-        default:
-           $period = '';
-    }
-
-
-
-    return view('medical-institution-period', [
-        'pages' => $pages,
-        'medicalInstitution' => $medicalInstitution,
-        'period' => $period
-
-    ]);
-})->name('medicalInstitutionPeriod');
-
-Route::get('/medicalInstitution/{id}', function ($id) {
-    $pages = [
-        ['id' => 1, 'name' => 'План'],
-    ];
-
-     $medicalInstitution = MedicalInstitution::find($id);
-
-    return view('medical-institution', [
-        'pages' => $pages,
-        'medicalInstitution' => $medicalInstitution
-
-    ]);
-})->name('medicalInstitution');
-
-Route::get('/page/{id}', function ($id) {
-
-    return redirect('/');
-})->name('page');

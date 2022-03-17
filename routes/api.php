@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CareProfilesController;
+use App\Http\Controllers\CategoryTreeController;
 use App\Http\Controllers\MedicalInstitutionController;
 use App\Http\Controllers\MedicalInstitutionDepartmentController;
 use App\Http\Controllers\MedicalInstitutionIdsController;
@@ -17,6 +18,8 @@ use App\Http\Controllers\UsedMedicalAssistanceTypeController;
 use App\Http\Controllers\UsedMedicalServicesController;
 use App\Http\Controllers\IndicatorsController;
 use App\Http\Controllers\InitialDataController;
+use App\Http\Controllers\PeriodController;
+use App\Http\Controllers\PlannedIndicatorChangeController;
 use App\Http\Controllers\PlannedIndicatorController;
 use App\Http\Controllers\UsedCareProfilesController;
 use App\Http\Controllers\VmpGroupController;
@@ -59,6 +62,9 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('care-profiles', CareProfilesController::class);
         Route::apiResource('vmp-types', VmpTypesController::class);
         Route::apiResource('vmp-groups', VmpGroupController::class);
+        Route::get('/node/{nodeId}/cildren', [CategoryTreeController::class, 'nodeWithChildren']);
+        Route::apiResource('planned-indicator-change', PlannedIndicatorChangeController::class);
+        Route::apiResource('periods', PeriodController::class);
     });
 
 

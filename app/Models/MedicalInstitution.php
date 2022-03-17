@@ -10,6 +10,5 @@ class MedicalInstitution extends Model
 {
     use SoftDeletes;
 
-    protected $dates = ['deleted_at'];
     protected $table = 'v_mo';
 }

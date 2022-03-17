@@ -10,6 +10,5 @@ class HospitalBedProfiles extends Model
 {
     use SoftDeletes;
 
-    protected $dates = ['deleted_at'];
     protected $table = 'tbl_hospital_bed_profiles';
 }

@@ -174,6 +174,15 @@ return [
             'tries' => 1,
             'nice' => 0,
         ],
+        'supervisor-2' => [
+            'connection' => 'redis',
+            'queue' => ['default'],
+            'balance' => 'auto',
+            'maxProcesses' => 1,
+            'memory' => 128,
+            'tries' => 1,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -188,6 +197,10 @@ return [
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 4,
+            ],
+            'supervisor-2' => [
+                'queue' => ['one-thread'],
+                'maxProcesses' => 1,
             ],
         ],
     ],

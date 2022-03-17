@@ -10,6 +10,5 @@ class VmpGroup extends Model
 {
     use SoftDeletes;
 
-    protected $dates = ['deleted_at'];
     protected $table = 'tbl_vmp_groups';
 }

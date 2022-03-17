@@ -3,15 +3,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\CategoryTreeNodes;
 use App\Models\PlannedIndicator;
 use App\Models\Indicator;
-use App\Models\HospitalBedProfiles;
-use App\Models\MedicalAssistanceType;
-use Illuminate\Http\Request;
-
-//use App\Http\Resources\IndicatorCollection;
-//use App\Http\Resources\IndicatorResource;
-use Validator;
+use Illuminate\Support\Facades\DB;
 
 class NodeService
 {
@@ -32,13 +27,24 @@ class NodeService
 
     /**
      * Возвращает массив id плановых показателей для переданного id узла дерева категорий
-     * (плановый показатель = показатель,услуга,профиль,ФАП )
+     * (плановый показатель = показатель,услуга,профиль,вид медпомощи, вид и группа ВМП... )
      *
      * @return \Illuminate\Http\Response
      */
-    public function plannedIndicatorsForNodeId(int $nodeId)
+    public function plannedIndicatorsForNodeId(int $nodeId): array
     {
-        return PlannedIndicator::select('id')->where('node_id', $nodeId)->pluck('id');
+        return PlannedIndicator::select('id')->where('node_id', $nodeId)->pluck('id')->toArray();
+    }
+
+    /**
+     * Возвращает массив id плановых показателей для переданного массива id узлов дерева категорий
+     * (плановый показатель = показатель,услуга,профиль,вид медпомощи, вид и группа ВМП... )
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function plannedIndicatorsForNodeIds(array $nodeIds): array
+    {
+        return PlannedIndicator::select('id')->whereIn('node_id', $nodeIds)->pluck('id')->toArray();
     }
 
 
@@ -90,4 +96,26 @@ class NodeService
         return $usedIds;
     }
 
+    public function nodeWithChildrenIds(int $nodeId)
+    {
+        $column = 'id';
+        /*
+        $res = DB::select("with RECURSIVE cte as
+            (
+                select tct.id, tct.parent_id from tbl_category_tree tct where tct.id = ?
+                union all
+                select tct.id, tct.parent_id from tbl_category_tree tct
+                inner join cte as c on c.id = tct.parent_id
+            )
+            select id from cte;",
+            [$nodeId]
+            );
+        */
+        /**/
+        $query = CategoryTreeNodes::select('id', 'parent_id')->join('cte', 'parent_id', '=', 'cte.node_id');
+        $nodes = CategoryTreeNodes::select('id', 'parent_id')->where('id', '=', $nodeId)->unionAll($query);
+        $res = DB::select("WITH recursive cte (node_id, node_parent_id) AS ({$nodes->toSql()}) select node_id as id from cte order by node_id;",[$nodeId]);
+        $ids = array_column($res, 'id');
+        return $ids;
+    }
 }

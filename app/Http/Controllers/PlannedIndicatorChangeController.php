@@ -1,26 +1,24 @@
 <?php
-declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-
-use App\Services\InitialDataService;
-use App\Services\Dto\InitialDataValueDto;
-use App\Http\Resources\InitialDataCollection;
-use App\Http\Resources\InitialDataResource;
+use App\Http\Resources\PlannedIndicatorChangeCollection;
+use App\Http\Resources\PlannedIndicatorChangeResource;
 use App\Rules\BCMathString;
+use App\Services\Dto\PlannedIndicatorChangeValueDto;
+use App\Services\PlannedIndicatorChangeService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
-class InitialDataController extends Controller
+class PlannedIndicatorChangeController extends Controller
 {
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request, InitialDataService $initialDataService)
+    public function index(Request $request, PlannedIndicatorChangeService $plannedIndicatorChangeInitService)
     {
         $validator = Validator::make($request->all(),[
             'node' => 'required|integer|min:1|max:40',
@@ -32,11 +30,11 @@ class InitialDataController extends Controller
         $nodeId = (int)$request->node;
         $year = (int)$request->year;
 
-        $data = $initialDataService->getByNodeIdAndYear($nodeId, $year);
+        $data = $plannedIndicatorChangeInitService->getByNodeIdAndYear($nodeId, $year);
         //var_dump($data[0]);
         //return $data;
         //dd($data);
-        return new InitialDataCollection(collect($data));
+        return new PlannedIndicatorChangeCollection(collect($data));
     }
 
     /**
@@ -45,13 +43,13 @@ class InitialDataController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request, InitialDataService $initialDataService)
+    public function store(Request $request, PlannedIndicatorChangeService $plannedIndicatorChangeService)
     {
         $user = Auth::user();
         $userId = $user->id;
 
         $validator = Validator::make($request->all(), [
-            'year' => 'required|integer|min:2020|max:2099',
+            'periodId' => 'required|integer|min:1',
             'moId' => 'required|integer',
             'moDepartmentId' => 'integer',
             'plannedIndicatorId' => 'required|integer',
@@ -66,8 +64,8 @@ class InitialDataController extends Controller
         if(isset($validated['moDepartmentId'])) {
             $departmentId = (int)$validated['moDepartmentId'];
         }
-        $dto = new InitialDataValueDto(
-            year: (int)$validated['year'],
+        $dto = new PlannedIndicatorChangeValueDto(
+            periodId: (int)$validated['periodId'],
             moId: (int)$validated['moId'],
             moDepartmentId: $departmentId,
             plannedIndicatorId: (int)$validated['plannedIndicatorId'],
@@ -75,26 +73,16 @@ class InitialDataController extends Controller
             userId: $userId
         );
 
-        return new InitialDataResource($initialDataService->setValue($dto)->value);
-        //
-        /*
-        $initialData = new InitialData();
-        $initialData->year = $request->year;
-        $initialData->mo_id = $request->mo;
-        $initialData->planned_indicator_id = ;
-        $initialData->value = $request->value;
-        $initialData->algorithm_id =
-        $initialData->user_id = $userId;
-        */
+        return new PlannedIndicatorChangeResource($plannedIndicatorChangeService->setValue($dto)->value);
     }
 
     /**
      * Display the specified resource.
      *
-     * @param  \App\Models\InitialData  $initialData
+     * @param  \App\Models\PlannedIndicatorChange  $plannedIndicatorChange
      * @return \Illuminate\Http\Response
      */
-    public function show(InitialDataService $initialDataService)
+    public function show()
     {
         //
     }
@@ -103,10 +91,10 @@ class InitialDataController extends Controller
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\InitialData  $initialData
+     * @param  \App\Models\PlannedIndicatorChange  $plannedIndicatorChange
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, InitialDataService $initialDataService)
+    public function update(Request $request)
     {
         //
     }
@@ -114,10 +102,10 @@ class InitialDataController extends Controller
     /**
      * Remove the specified resource from storage.
      *
-     * @param  \App\Models\InitialData  $initialData
+     * @param  \App\Models\PlannedIndicatorChange  $plannedIndicatorChange
      * @return \Illuminate\Http\Response
      */
-    public function destroy(InitialDataService $initialDataService)
+    public function destroy()
     {
         //
     }

@@ -6,9 +6,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Indicator extends Model
+class PlannedIndicatorChange extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'tbl_indicators';
+    public $table = 'tbl_indicators_changes';
+
 }
