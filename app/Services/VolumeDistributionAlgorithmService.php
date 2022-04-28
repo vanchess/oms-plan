@@ -11,7 +11,7 @@ class VolumeDistributionAlgorithmService
 
     public function getAlgorithmId(int $indicatorId)
     {
-        if($indicatorId === 1) {
+        if($indicatorId === 1 || $indicatorId === 10) {
             return 1;
         }
         return 2;
