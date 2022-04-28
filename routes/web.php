@@ -76,6 +76,18 @@ Route::get('/321123', function (InitialDataService $initialDataService) {
     //phpinfo();
 });
 
+Route::get('/initial_changes', function () {
+    InitialChanges::dispatch(2022);
+    return "initial_changes";
+});
+
+Route::get('/all_initial_data_loaded', function () {
+    InitialDataLoaded::dispatch(1, 2022, 1);
+    InitialDataLoaded::dispatch(9, 2022, 1);
+    InitialDataLoaded::dispatch(17, 2022, 1);
+    return "all_initial_data_loaded";
+});
+
 Route::get('/', function (DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService) {
     // InitialChanges::dispatch(2022);
     // InitialDataLoaded::dispatch(2, 2022, 1);
