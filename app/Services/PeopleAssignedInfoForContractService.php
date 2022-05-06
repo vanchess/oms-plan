@@ -23,8 +23,8 @@ class PeopleAssignedInfoForContractService
         $hospitalNodeIds = [35];
         $ambulanceNodeIds = [39];
 
-        $polyclinicNodeIds = [36,37,38];
-        $polyclinicFapNodeIds = [37];
+        $polyclinicNodeIds = [29,28];
+        $polyclinicFapNodeIds = [29];
 
         $periodIds = $this->periodService->getIdsByYear($year);
         $periodIds = [$periodIds[array_key_last($periodIds)]];
