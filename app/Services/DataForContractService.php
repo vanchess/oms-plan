@@ -18,6 +18,10 @@ class DataForContractService
         return $this->CreateData($year, $commitId)->toJson();
     }
 
+    public function GetArray(int $year, int $commitId = null): array {
+        return $this->CreateData($year, $commitId)->toArray();
+    }
+
     private function CreateData(int $year, int $commitId = null) {
         $indicatorIds = [2, 4, 5, 6, 7, 8, 9];
 
