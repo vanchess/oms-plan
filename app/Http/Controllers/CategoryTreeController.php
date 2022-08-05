@@ -20,4 +20,16 @@ class CategoryTreeController extends Controller
 
         return $nodeService->nodeWithChildrenIds($nodeId);
     }
+
+    public function getCategoryTree(Validator $v, NodeService $nodeService, int $rootNodeId)
+    {
+        $validator = $v->make(['node' => $rootNodeId],[
+            'node' => 'required|integer|min:1|max:40'
+        ]);
+        if ($validator->fails()) {
+            return response()->json($validator->errors()->toJson(), 400);
+        }
+
+        return $nodeService->nodeTree($rootNodeId);
+    }
 }

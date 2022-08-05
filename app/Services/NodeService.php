@@ -6,6 +6,7 @@ namespace App\Services;
 use App\Models\CategoryTreeNodes;
 use App\Models\PlannedIndicator;
 use App\Models\Indicator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class NodeService
@@ -96,9 +97,8 @@ class NodeService
         return $usedIds;
     }
 
-    public function nodeWithChildrenIds(int $nodeId)
+    private function nodeWithChildren(int $nodeId)
     {
-        $column = 'id';
         /*
         $res = DB::select("with RECURSIVE cte as
             (
@@ -111,11 +111,41 @@ class NodeService
             [$nodeId]
             );
         */
-        /**/
         $query = CategoryTreeNodes::select('id', 'parent_id')->join('cte', 'parent_id', '=', 'cte.node_id');
         $nodes = CategoryTreeNodes::select('id', 'parent_id')->where('id', '=', $nodeId)->unionAll($query);
-        $res = DB::select("WITH recursive cte (node_id, node_parent_id) AS ({$nodes->toSql()}) select node_id as id from cte order by node_id;",[$nodeId]);
+        $res = DB::select("WITH recursive cte (node_id, node_parent_id) AS ({$nodes->toSql()}) select node_id as id, node_parent_id as parent_id from cte order by node_id;",[$nodeId]);
+        return $res;
+
+    }
+
+    public function nodeWithChildrenIds(int $nodeId): array
+    {
+        $res = $this->nodeWithChildren($nodeId);
+
         $ids = array_column($res, 'id');
         return $ids;
+    }
+
+    private function createTree(Collection $c, $curId)
+    {
+        $children = $c->where('parent_id', $curId)->toArray();
+        if(count($children) === 0) {
+            return null;
+        }
+        $branch = [];
+        foreach ($children as $key => $el) {
+            $branch[$el->id] = $this->createTree($c, $el->id);
+        }
+        return $branch;
+    }
+
+    public function nodeTree(int $rootNodeId)
+    {
+        $res = $this->nodeWithChildren($rootNodeId);
+        $res = collect($res);
+
+        $tree[$rootNodeId] = $this->createTree($res, $rootNodeId);
+
+        return $tree;
     }
 }

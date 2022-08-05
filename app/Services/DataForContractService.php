@@ -22,7 +22,30 @@ class DataForContractService
         return $this->CreateData($year, $commitId)->toArray();
     }
 
+    public function GetArrayByYearAndMonth(int $year, int $monthNum, int $commitId = null): array {
+        return $this->CreateDataByYearAndMonth($year, $monthNum, $commitId)->toArray();
+    }
+
     private function CreateData(int $year, int $commitId = null) {
+        $periodIds = $this->periodService->getIdsByYear($year);
+        $data = $this->CreateDataByPeriodIds($periodIds, $commitId);
+
+        return collect([
+            'year' => $year,
+            'mo' => $data
+        ]);
+    }
+
+    private function CreateDataByYearAndMonth(int $year, int $monthNum, int $commitId = null) {
+        $periodIds = $this->periodService->getIdsByYearAndMonth($year, $monthNum);
+        $data = $this->CreateDataByPeriodIds($periodIds, $commitId);
+
+        return collect([
+            'mo' => $data
+        ]);
+    }
+
+    private function CreateDataByPeriodIds(array $periodIds, int $commitId = null) {
         $indicatorIds = [2, 4, 5, 6, 7, 8, 9];
 
         $hospitalNodeIds = [1,2,3,4,5,6,7];
@@ -39,8 +62,6 @@ class DataForContractService
         $polyclinicPerPersonNodeIds = [10,28,32];
         $polyclinicPerUnitNodeIds = [11,30,31];
         $polyclinicFapNodeIds = [12,29,33];
-
-        $periodIds = $this->periodService->getIdsByYear($year);
 
         $dataSql = DB::table((new PlannedIndicator())->getTable().' as pi')
         ->selectRaw('SUM(value) as value, node_id, indicator_id, service_id, profile_id, assistance_type_id, care_profile_id, vmp_group_id, vmp_type_id, mo_id, planned_indicator_id, mo_department_id')
@@ -327,9 +348,6 @@ class DataForContractService
                 }
             }
         }
-        return collect([
-            'year' => $year,
-            'mo' => $data
-        ]);
+        return $data;
     }
 }

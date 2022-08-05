@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CategoryTreeController;
 use App\Jobs\InitialChanges;
 use App\Jobs\InitialDataLoaded;
 use App\Models\CareProfiles;
@@ -94,6 +95,8 @@ class MedicalServicesEnum {
         public const FetalUltrasound = 12;
 }
 
+Route::get('/category-tree/{rootNodeId}', [CategoryTreeController::class, 'getCategorySqlTreeStructure']);
+
 Route::get('/321123', function (InitialDataService $initialDataService) {
 
     $nodeId = 4;
@@ -143,6 +146,1427 @@ Route::get('/all_initial_data_loaded', function () {
     return "all_initial_data_loaded";
 });
 
+
+
+Route::get('/vitacore', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService) {
+    $path = 'xlsx';
+
+    $months = [
+        1 => 'Январь',
+        2 => 'Февраль',
+        3 => 'Март',
+        4 => 'Апрель',
+        5 => 'Май',
+        6 => 'Июнь',
+        7 => 'Июль',
+        8 => 'Август',
+        9 => 'Сентябрь',
+        10 => 'Октябрь',
+        11 => 'Ноябрь',
+        12 => 'Декабрь',
+    ];
+
+    $resultFileName = 'vitacore.xlsx';
+    $strDateTimeNow = date("Y-m-d-His");
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $fullResultFilepath = Storage::path($resultFilePath);
+
+    bcscale(4);
+
+    $year = 2022;
+    $commit = null;
+    $content = $dataForContractService->GetArray($year, $commit);
+    $contentByMonth = [];
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $contentByMonth[$monthNum] = $dataForContractService->GetArrayByYearAndMonth($year, $monthNum);
+    }
+
+    $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, $commit);
+    $moCollection = MedicalInstitution::orderBy('order')->get();
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+    // MO
+    $ordinalRowNum = 0;
+    $firstTableHeadRowIndex = 2;
+    $firstTableDataRowIndex = 6;
+    $firstTableColIndex = 1;
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $ordinalRowNum++;
+        $colOfset = 0;
+        $sheet->setCellValue([$firstTableColIndex + $colOfset, $firstTableDataRowIndex + $rowOffset], "$ordinalRowNum");
+        $colOfset++;
+        $sheet->setCellValue([$firstTableColIndex + $colOfset, $firstTableDataRowIndex + $rowOffset], $mo->code);
+        $colOfset++;
+        $sheet->setCellValue([$firstTableColIndex + $colOfset, $firstTableDataRowIndex + $rowOffset], $mo->short_name);
+        $colOfset++;
+        $rowOffset++;
+    }
+    //$sheet = $spreadsheet->getSheetByName('1.Скорая помощь');
+    $category = 'ambulance';
+    $indicatorId = 5; // вызовов
+    $callsAssistanceTypeId = 5; // вызовы
+    $thrombolysisAssistanceTypeId = 6;// тромболизис
+    $rowOffset = 0;
+
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Скорая помощь, плановые объемы на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 23, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], "Численность прикрепленного населения на 01.01.$year");
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, объемы скорой помощи');
+    //$sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 1, $firstTableHeadRowIndex + 1]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 2], 'вызовов');
+    //$sheet->setCellValue([$curColumn + 1, $firstTableHeadRowIndex + 2], 'в том числе вызовов с проведением тромболитической терапии');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, объемы скорой помощи помесячно');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+    $sheet->setCellValue([$curColumn + 12, $firstTableHeadRowIndex + 1], 'в том числе вызовов с проведением тромболитической терапии');
+    $sheet->mergeCells([$curColumn + 12, $firstTableHeadRowIndex + 1, $curColumn + 23, $firstTableHeadRowIndex + 1]);
+    /*
+    foreach($moCollection as $mo) {
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        //$peopleAssignedValue = $peopleAssigned[$mo->id][$category]['peopleAssigned'] ?? 0;
+        $thrombolysis   = $content['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
+        $calls          = $content['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? 0;
+
+        // Численность прикрепленного населения на 01.01.xxxx
+        //$sheet->setCellValue([$curColumn, $curRow], $peopleAssignedValue);
+        // Всего, объемы скорой помощи
+        // вызовов
+        $sheet->setCellValue([$curColumn, $curRow], $calls + $thrombolysis);
+        // в том числе вызовов с проведением тромболитической терапии
+        $sheet->setCellValue([$curColumn + 1, $curRow], $thrombolysis);
+        $rowOffset++;
+    }
+    $colOfset += 2;
+*/
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $thrombolysis   = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
+            $calls          = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? 0;
+
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            // Всего, объемы скорой помощи
+            // вызовов
+            $sheet->setCellValue([$curColumn, $curRow], $calls + $thrombolysis);
+            $rowOffset++;
+        }
+
+    }
+    $colOfset += 12;
+
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $thrombolysis   = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
+
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            // в том числе вызовов с проведением тромболитической терапии
+            $sheet->setCellValue([$curColumn, $curRow], $thrombolysis);
+            $rowOffset++;
+        }
+
+    }
+    $colOfset += 12;
+
+    $indicatorId = 4; // стоимость
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], 'Скорая помощь, финансовое обеспечение');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, руб.');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Скорая помощь, финансовое обеспечение');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+/*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $calls = $content['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? '0';
+        $thrombolysis = $content['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? '0';
+        $sheet->setCellValue([$curColumn, $curRow], bcadd($calls, $thrombolysis));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+*/
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $calls = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? '0';
+            $thrombolysis = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? '0';
+            $sheet->setCellValue([$curColumn, $curRow], bcadd($calls, $thrombolysis));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+
+    // 2.обращения по заболеваниям
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], "Численность прикрепленного населения на 01.01.$year");
+    //$sheet->setCellValue([$curColumn + 1, $firstTableHeadRowIndex + 1], 'Всего, обращений');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'обращений');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+    $category = 'polyclinic';
+    $indicatorId = 8; // обращений
+    $assistanceTypeId = 4; // обращения по заболеваниям
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+
+        $peopleAssignedPolyclinicValue = $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0;
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn, $curRow], $peopleAssignedPolyclinicValue);
+        $sheet->setCellValue([$curColumn + 1, $curRow], $perPerson + $perUnit + $fap );
+        $rowOffset++;
+    }
+    $colOfset += 2;
+    */
+
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            }
+
+            $sheet->setCellValue([$curColumn, $curRow], $perPerson + $perUnit + $fap );
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 3.Посещения с иными целями
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, посещения с иными целями");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, посещений');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'посещений');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+    $category = 'polyclinic';
+    $indicatorId = 9; // посещений
+    $assistanceTypeIds = [1, 2]; //	посещения профилактические, посещения разовые по заболеваниям
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $v = 0;
+        foreach($assistanceTypeIds as $assistanceTypeId) {
+            $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            }
+            $v += ($perPerson + $perUnit + $fap);
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+
+    }
+    $colOfset += 12;
+
+    // 4 Неотложная помощь
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, неотложная помощь");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, посещений');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'посещений');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 9; // посещений
+    $assistanceTypeIds = [3]; //	посещения неотложные
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $v = 0;
+        foreach($assistanceTypeIds as $assistanceTypeId) {
+            $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            }
+            $v += ($perPerson + $perUnit + $fap);
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+
+    // 2.2 КТ
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на  $year год (компьютерная томография)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::KT;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 2.3 МРТ
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на  $year год (магнитно-резонансная томография)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::MRT;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 2.4 УЗИ ССС
+    // УЗИ сердечно-сосудистой системы
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на  $year год (УЗИ сердечно-сосудистой системы)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::UltrasoundCardio;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+
+    // 2.5 Эндоскопия
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на  $year год (Эндоскопические исследования)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::Endoscopy;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+
+    }
+    $colOfset += 12;
+
+    // 2.6 ПАИ
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на  $year год (Паталого анатомическое исследование биопсийного материала с целью диагностики онкологических заболеваний)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::PathologicalAnatomicalBiopsyMaterial;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 2.7 МГИ
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на  $year год (Малекулярно-генетические исследования с целью диагностики онкологических заболеваний)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::MolecularGeneticDetectionOncological;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 2.8  Тест.covid-19
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на  $year год (Тестирование на выявление covid-19)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::CovidTesting;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 3.3 УЗИ плода
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, УЗИ плода (1 триместр)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::FetalUltrasound;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 3.4 Компл.иссл. репрод.орг.
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, комплексное исследование для диагностики фоновых и предраковых заболеваний репродуктивных органов у женщин");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::DiagnosisBackgroundPrecancerousDiseasesReproductiveWomen;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 3.5 Опред.антигена D
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, определение антигена D системы Резус (резус-фактор плода)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, услуг');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'услуг');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $indicatorId = 6; // услуг
+    $serviceId = MedicalServicesEnum::DeterminationAntigenD;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        $fap = 0;
+        foreach ($faps as $f) {
+            $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'][$serviceId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['services'][$serviceId][$indicatorId] ?? 0;
+            }
+            $sheet->setCellValue([$curColumn,$curRow], ($perPerson + $perUnit + $fap));
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 5. Круглосуточный ст.
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Объемы медицинской помощи в условиях круглосуточного стационара (не включая ВМП и медицинскую реабилитацию) на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, госпитализаций (не включая медицинскую реабилитацию и ВМП)');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'госпитализаций (не включая медицинскую реабилитацию и ВМП)');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'hospital';
+    $indicatorId = 7; // госпитализаций
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $bedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
+        $v = 0;
+        foreach ($bedProfiles as $bp) {
+            $v += $bp[$indicatorId];
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
+            $v = 0;
+            foreach ($bedProfiles as $bp) {
+                $v += $bp[$indicatorId];
+            }
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 6.ВМП
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Объемы высокотехнологичной медицинской помощи в условиях круглосуточного стационара на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Объемы высокотехнологичной медицинской помощи, всего, госпитализаций');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'госпитализаций');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'hospital';
+    $indicatorId = 7; // госпитализаций
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];
+        $v = 0;
+        foreach ($careProfiles as $vmpGroups) {
+            foreach ($vmpGroups as $vmpTypes) {
+                foreach ($vmpTypes as $vmpT)
+                $v += $vmpT[$indicatorId];
+            }
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];
+            $v = 0;
+            foreach ($careProfiles as $vmpGroups) {
+                foreach ($vmpGroups as $vmpTypes) {
+                    foreach ($vmpTypes as $vmpT)
+                    $v += $vmpT[$indicatorId];
+                }
+            }
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 7. Медреабилитация в КС
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Объемы  медицинской реабилитации в условиях круглосуточного стационара на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, случаев лечения');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'случаев лечения');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'hospital';
+    $indicatorId = 7; // госпитализаций
+    $bedProfileId = 32; // реабилитационные соматические;
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $v = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'][$bedProfileId][$indicatorId] ?? 0;
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $v = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'][$bedProfileId][$indicatorId] ?? 0;
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 8. Дневные стационары
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Объемы медицинской помощи в условиях дневных стационаров на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    // $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, случаев лечения');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'случаев лечения');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $category = 'hospital';
+    $indicatorId = 2; // случаев лечения
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $v = 0;
+        $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+        foreach ($bedProfiles as $bp) {
+            $v += $bp[$indicatorId];
+        }
+
+        $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+        foreach ($bedProfiles as $bp) {
+            $v += $bp[$indicatorId];
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $v = 0;
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bp) {
+                $v += $bp[$indicatorId];
+            }
+
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bp) {
+                $v += $bp[$indicatorId];
+            }
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 3. ДС, фин.обеспечение
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Финансовое обеспечение медицинской помощи в условиях дневных стационаров на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, руб.');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'руб.');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+    $category = 'hospital';
+    $indicatorId = 4; // стоимость
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $v = '0';
+        $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+        foreach ($bedProfiles as $bp) {
+            $v = bcadd($v, $bp[$indicatorId]);
+        }
+
+        $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+        foreach ($bedProfiles as $bp) {
+            $v = bcadd($v, $bp[$indicatorId]);
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $v = '0';
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bp) {
+                $v = bcadd($v, $bp[$indicatorId]);
+            }
+
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bp) {
+                $v = bcadd($v, $bp[$indicatorId]);
+            }
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 4 КС, фин.обеспечение (не включая мед.реабилитацию и ВМП)
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Финансовое обеспечение  медицинской помощи в условиях круглосуточного стационара на $year год (не включая медицинскую реабилитацию и ВМП)");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, руб.');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'руб.');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+    $category = 'hospital';
+    $bedProfileId = 32; // реабилитационные соматические;
+    $indicatorId = 4; // стоимость
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $bedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
+        $v = '0';
+        foreach ($bedProfiles as $bpId => $bp) {
+            if($bpId === $bedProfileId) {
+                continue;
+            }
+            $v = bcadd($v, $bp[$indicatorId]);
+        }
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
+            $v = '0';
+            foreach ($bedProfiles as $bpId => $bp) {
+                if($bpId === $bedProfileId) {
+                    continue;
+                }
+                $v = bcadd($v, $bp[$indicatorId]);
+            }
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 5 МР, фин.обеспечение
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Финансовое обеспечение медицинской реабилитации в условиях круглосуточного стационара на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, руб.');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'руб.');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+    $category = 'hospital';
+    $bedProfileId = 32; // реабилитационные соматические;
+    $indicatorId = 4; // стоимость
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $v = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'][$bedProfileId][$indicatorId] ?? 0;
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn,$curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $v = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'][$bedProfileId][$indicatorId] ?? 0;
+            $sheet->setCellValue([$curColumn,$curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // 6 ВМП, фин.обеспечение
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Финансовое обеспечение ВМП в условиях круглосуточного стационара на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11, $firstTableHeadRowIndex]);
+    //$sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, руб.');
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'руб.');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+    $category = 'hospital';
+    $indicatorId = 4; // стоимость
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+        $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];
+        $v = '0';
+        foreach ($careProfiles as $vmpGroups) {
+            foreach ($vmpGroups as $vmpTypes) {
+                foreach ($vmpTypes as $vmpT) {
+                    $v = bcadd($v, $vmpT[$indicatorId] ?? '0');
+                }
+            }
+        }
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $sheet->setCellValue([$curColumn, $curRow], $v);
+        $rowOffset++;
+    }
+    $colOfset += 1;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];
+            $v = '0';
+            foreach ($careProfiles as $vmpGroups) {
+                foreach ($vmpGroups as $vmpTypes) {
+                    foreach ($vmpTypes as $vmpT) {
+                        $v = bcadd($v, $vmpT[$indicatorId] ?? '0');
+                    }
+                }
+            }
+            $sheet->setCellValue([$curColumn, $curRow], $v);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+
+    // 2. АП фин.обесп.
+    $curColumn = $firstTableColIndex + $colOfset;
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex], "Финансовое обеспечение медицинской помощи в  амбулаторных условиях на $year год");
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex, $curColumn + 11 + 12 + 12 + 12, $firstTableHeadRowIndex]);
+    /*
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Всего, руб.');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn, $firstTableHeadRowIndex + 3]);
+    $sheet->setCellValue([$curColumn + 1, $firstTableHeadRowIndex + 1], 'в том числе');
+    $sheet->mergeCells([$curColumn + 1, $firstTableHeadRowIndex + 1, $curColumn + 4, $firstTableHeadRowIndex + 1]);
+    $sheet->setCellValue([$curColumn + 1, $firstTableHeadRowIndex + 2], 'Финансовое обеспечение медицинской помощи по подушевому нормативу финансирования на прикрепившихся лиц');
+    $sheet->mergeCells([$curColumn + 1, $firstTableHeadRowIndex + 2, $curColumn + 1, $firstTableHeadRowIndex + 3]);
+    $sheet->setCellValue([$curColumn + 2, $firstTableHeadRowIndex + 2], 'Финансовое обеспечение медицинской помощи по нормативу финансирования структурного подразделения');
+    $sheet->mergeCells([$curColumn + 2, $firstTableHeadRowIndex + 2, $curColumn + 2, $firstTableHeadRowIndex + 3]);
+    $sheet->setCellValue([$curColumn + 3, $firstTableHeadRowIndex + 2], 'Финансовое обеспечение медицинской помощи в амбулаторных условиях за единицу объема медицинской помощи');
+    $sheet->mergeCells([$curColumn + 3, $firstTableHeadRowIndex + 2, $curColumn + 4, $firstTableHeadRowIndex + 2]);
+    $sheet->setCellValue([$curColumn + 3, $firstTableHeadRowIndex + 3], 'проведение диагностических исследований');
+    $sheet->setCellValue([$curColumn + 4, $firstTableHeadRowIndex + 3], 'посещения, обращения');
+    */
+    $sheet->setCellValue([$curColumn, $firstTableHeadRowIndex + 1], 'Финансовое обеспечение медицинской помощи по подушевому нормативу финансирования на прикрепившихся лиц');
+    $sheet->mergeCells([$curColumn, $firstTableHeadRowIndex + 1, $curColumn + 11, $firstTableHeadRowIndex + 1]);
+
+    $sheet->setCellValue([$curColumn + 12, $firstTableHeadRowIndex + 1], 'Финансовое обеспечение медицинской помощи по нормативу финансирования структурного подразделения');
+    $sheet->mergeCells([$curColumn + 12, $firstTableHeadRowIndex + 1, $curColumn + 11 + 12, $firstTableHeadRowIndex + 1]);
+
+    $sheet->setCellValue([$curColumn + 12 + 12, $firstTableHeadRowIndex + 1], 'Финансовое обеспечение медицинской помощи в амбулаторных условиях за единицу объема медицинской помощи (проведение диагностических исследований)');
+    $sheet->mergeCells([$curColumn + 12 + 12, $firstTableHeadRowIndex + 1, $curColumn + 11 + 12 + 12, $firstTableHeadRowIndex + 1]);
+
+    $sheet->setCellValue([$curColumn + 12 + 12 + 12, $firstTableHeadRowIndex + 1], 'Финансовое обеспечение медицинской помощи в амбулаторных условиях за единицу объема медицинской помощи (посещения, обращения)');
+    $sheet->mergeCells([$curColumn + 12 + 12 + 12, $firstTableHeadRowIndex + 1, $curColumn + 11 + 12 + 12 + 12, $firstTableHeadRowIndex + 1]);
+
+    $category = 'polyclinic';
+    $assistanceTypeId = 4; //обращения по заболеваниям
+    $indicatorId = 4; // стоимость
+    /*
+    $rowOffset = 0;
+    foreach($moCollection as $mo) {
+
+        $perPersonSum = '0';
+        $assistanceTypesPerPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'] ?? [];
+        $servicesPerPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['services'] ?? [];
+        foreach ($assistanceTypesPerPerson as $assistanceType) {
+            $perPersonSum = bcadd($perPersonSum, $assistanceType[$indicatorId] ?? '0');
+        }
+        foreach ($servicesPerPerson as $service) {
+            $perPersonSum = bcadd($perPersonSum, $service[$indicatorId] ?? '0');
+        }
+
+        $perUnitAssistanceTypesSum = '0';
+        $perUnitServicesSum = '0';
+        $assistanceTypesPerUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'] ?? [];
+        $servicesPerPerUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['services'] ?? [];
+        foreach ($assistanceTypesPerUnit as $assistanceType) {
+            $perUnitAssistanceTypesSum = bcadd($perUnitAssistanceTypesSum, $assistanceType[$indicatorId] ?? '0');
+        }
+        foreach ($servicesPerPerUnit as $service) {
+            $perUnitServicesSum = bcadd($perUnitServicesSum, $service[$indicatorId] ?? '0');
+        }
+
+        $fapSum = '0';
+        $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+        foreach ($faps as $f) {
+            $assistanceTypes = $f['assistanceTypes'] ?? [];
+            foreach ($assistanceTypes as $assistanceType) {
+                $fapSum = bcadd($fapSum, $assistanceType[$indicatorId] ?? 0);
+            }
+            $services = $f['services'] ?? [];
+            foreach ($services as $service) {
+                $fapSum = bcadd($fapSum, $service[$indicatorId] ?? 0);
+            }
+        }
+
+
+        $curRow = $firstTableDataRowIndex + $rowOffset;
+        $curColumn = $firstTableColIndex + $colOfset;
+        $polyclinicTotal = bcadd(bcadd($perPersonSum, $fapSum),bcadd($perUnitServicesSum, $perUnitAssistanceTypesSum));
+        $sheet->setCellValue([$curColumn, $curRow], $polyclinicTotal);
+        $sheet->setCellValue([$curColumn + 1, $curRow], $perPersonSum);
+        $sheet->setCellValue([$curColumn + 2, $curRow], $fapSum);
+        $sheet->setCellValue([$curColumn + 3, $curRow], $perUnitServicesSum);
+        $sheet->setCellValue([$curColumn + 4, $curRow], $perUnitAssistanceTypesSum);
+        $rowOffset++;
+    }
+    $colOfset += 5;
+    */
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perPersonSum = '0';
+            $assistanceTypesPerPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'] ?? [];
+            $servicesPerPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['services'] ?? [];
+            foreach ($assistanceTypesPerPerson as $assistanceType) {
+                $perPersonSum = bcadd($perPersonSum, $assistanceType[$indicatorId] ?? '0');
+            }
+            foreach ($servicesPerPerson as $service) {
+                $perPersonSum = bcadd($perPersonSum, $service[$indicatorId] ?? '0');
+            }
+            $sheet->setCellValue([$curColumn, $curRow], $perPersonSum);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $fapSum = '0';
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            foreach ($faps as $f) {
+                $assistanceTypes = $f['assistanceTypes'] ?? [];
+                foreach ($assistanceTypes as $assistanceType) {
+                    $fapSum = bcadd($fapSum, $assistanceType[$indicatorId] ?? 0);
+                }
+                $services = $f['services'] ?? [];
+                foreach ($services as $service) {
+                    $fapSum = bcadd($fapSum, $service[$indicatorId] ?? 0);
+                }
+            }
+            $sheet->setCellValue([$curColumn, $curRow], $fapSum);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+            $perUnitServicesSum = '0';
+            $servicesPerPerUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['services'] ?? [];
+            foreach ($servicesPerPerUnit as $service) {
+                $perUnitServicesSum = bcadd($perUnitServicesSum, $service[$indicatorId] ?? '0');
+            }
+
+            $sheet->setCellValue([$curColumn, $curRow], $perUnitServicesSum);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    // помесячно
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $sheet->setCellValue([$firstTableColIndex + $colOfset + $monthNum - 1, $firstTableHeadRowIndex + 2], $months[$monthNum]);
+        $rowOffset = 0;
+        foreach($moCollection as $mo) {
+            $curRow = $firstTableDataRowIndex + $rowOffset;
+            $curColumn = $firstTableColIndex + $colOfset + $monthNum - 1;
+
+            $perUnitAssistanceTypesSum = '0';
+            $assistanceTypesPerUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'] ?? [];
+            foreach ($assistanceTypesPerUnit as $assistanceType) {
+                $perUnitAssistanceTypesSum = bcadd($perUnitAssistanceTypesSum, $assistanceType[$indicatorId] ?? '0');
+            }
+            $sheet->setCellValue([$curColumn, $curRow], $perUnitAssistanceTypesSum);
+            $rowOffset++;
+        }
+    }
+    $colOfset += 12;
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save($fullResultFilepath);
+    return Storage::download($resultFilePath);
+});
+
+
 Route::get('/xlsx1', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService) {
     $path = 'xlsx';
     $templateFileName = '1.xlsx';
@@ -174,6 +1598,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['peopleAssigned'] ?? 0);
         $thrombolysis = $content['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
@@ -191,6 +1616,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
         $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
@@ -214,6 +1640,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
         $v = 0;
@@ -241,6 +1668,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
         $v = 0;
@@ -268,6 +1696,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -292,6 +1721,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -316,6 +1746,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -340,6 +1771,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -364,6 +1796,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -388,6 +1821,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -412,6 +1846,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -436,6 +1871,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -460,6 +1896,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -484,6 +1921,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -507,6 +1945,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
 
         $bedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
@@ -527,6 +1966,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
 
         $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];
@@ -551,6 +1991,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
 
         $v = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'][$bedProfileId][$indicatorId] ?? 0;
@@ -567,6 +2008,7 @@ Route::get('/xlsx1', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
 
         $v = 0;
@@ -738,6 +2180,7 @@ Route::get('/xlsx2', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['peopleAssigned'] ?? 0);
         $calls = $content['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? '0';
@@ -754,6 +2197,7 @@ Route::get('/xlsx2', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
 
@@ -808,6 +2252,7 @@ Route::get('/xlsx2', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
 
         $v = '0';
@@ -834,6 +2279,7 @@ Route::get('/xlsx2', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
 
         $bedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
@@ -857,6 +2303,7 @@ Route::get('/xlsx2', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
 
         $v = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'][$bedProfileId][$indicatorId] ?? 0;
@@ -872,6 +2319,7 @@ Route::get('/xlsx2', function (DataForContractService $dataForContractService, P
         $ordinalRowNum++;
         $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
 
         $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];

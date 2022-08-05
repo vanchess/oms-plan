@@ -5,7 +5,9 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CareProfilesController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CategoryTreeController;
+use App\Http\Controllers\CategoryTreeNodesController;
 use App\Http\Controllers\MedicalInstitutionController;
 use App\Http\Controllers\MedicalInstitutionDepartmentController;
 use App\Http\Controllers\MedicalInstitutionIdsController;
@@ -57,12 +59,15 @@ Route::group(array('prefix' => 'v1'), function()
         Route::get('/used-hospital-bed-profiles', [UsedHospitalBedProfilesController::class, 'hospitalBedProfilesUsedForNodeId']);
         Route::get('/used-medical-assistance-types', [UsedMedicalAssistanceTypeController::class, 'medicalAssistanceTypesUsedForNodeId']);
         Route::get('/used-medical-services', [UsedMedicalServicesController::class, 'medicalServicesUsedForNodeId']);
-        Route::get('/user-care-profiles',[UsedCareProfilesController::class, 'careProfilesUsedForNodeId']);
+        Route::get('/used-care-profiles',[UsedCareProfilesController::class, 'careProfilesUsedForNodeId']);
         Route::apiResource('node-init-data', InitialDataController::class);
         Route::apiResource('care-profiles', CareProfilesController::class);
         Route::apiResource('vmp-types', VmpTypesController::class);
         Route::apiResource('vmp-groups', VmpGroupController::class);
         Route::get('/node/{nodeId}/cildren', [CategoryTreeController::class, 'nodeWithChildren']);
+        Route::get('/category-tree/{rootNodeId}', [CategoryTreeController::class, 'getCategoryTree']);
+        Route::apiResource('category-tree-nodes', CategoryTreeNodesController::class);
+        Route::apiResource('categories', CategoryController::class);
         Route::apiResource('planned-indicator-change', PlannedIndicatorChangeController::class);
         Route::apiResource('periods', PeriodController::class);
     });
