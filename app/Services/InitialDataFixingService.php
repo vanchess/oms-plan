@@ -15,6 +15,11 @@ class InitialDataFixingService
         private NodeService $nodeService
     ) { }
 
+    public function getLoadedNodeIdsByYear(int $year): array
+    {
+        return InitialDataLoaded::where('year',$year)->orderBy('node_id')->get()->pluck('node_id')->toArray();
+    }
+
     public function fixed(int $nodeId, int $year): bool
     {
         $f = InitialDataLoaded::where('year',$year)->where('node_id',$nodeId)->first();

@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\PlannedIndicatorChangeCollection;
 use App\Http\Resources\PlannedIndicatorChangeResource;
+use App\Models\PlannedIndicator;
+use App\Models\PlannedIndicatorChange;
 use App\Rules\BCMathString;
+use App\Services\Dto\PlannedIndicatorChangeValueCollectionDto;
 use App\Services\Dto\PlannedIndicatorChangeValueDto;
 use App\Services\PlannedIndicatorChangeService;
 use Illuminate\Http\Request;
@@ -21,16 +24,17 @@ class PlannedIndicatorChangeController extends Controller
     public function index(Request $request, PlannedIndicatorChangeService $plannedIndicatorChangeInitService)
     {
         $validator = Validator::make($request->all(),[
-            'node' => 'required|integer|min:1|max:40',
+            'nodes'   => 'required|array',
+            'nodes.*' => 'required|integer|min:1|max:40',
             'year' => 'required|integer|min:2020|max:2099'
         ]);
         if ($validator->fails()) {
             return response()->json($validator->errors()->toJson(), 400);
         }
-        $nodeId = (int)$request->node;
+        $nodeIds = $request->nodes;
         $year = (int)$request->year;
 
-        $data = $plannedIndicatorChangeInitService->getByNodeIdAndYear($nodeId, $year);
+        $data = $plannedIndicatorChangeInitService->getByNodeIdsAndYear($nodeIds, $year);
         //var_dump($data[0]);
         //return $data;
         //dd($data);
@@ -74,6 +78,61 @@ class PlannedIndicatorChangeController extends Controller
         );
 
         return new PlannedIndicatorChangeResource($plannedIndicatorChangeService->setValue($dto)->value);
+    }
+
+    public function incrementValues(Request $request, PlannedIndicatorChangeService $plannedIndicatorChangeService)
+    {
+        bcscale(4);
+
+        $user = Auth::user();
+        $userId = $user->id;
+
+        $validator = Validator::make($request->all(), [
+            'values' => 'array',
+            'values.*.periodId' => 'required|integer|min:1',
+            'values.*.moId' => 'required|integer',
+            'values.*.moDepartmentId' => 'integer',
+            'values.*.plannedIndicatorId' => 'required|integer',
+            'values.*.value' => ['required', new BCMathString],
+            'total' => ['required', new BCMathString],
+        ]);
+        if ($validator->fails()) {
+            return response()->json($validator->errors()->toJson(), 400);
+        }
+        $validated = $validator->validated();
+
+        $sum = '0';
+        for ($i = 0; $i < count($validated['values']); $i++) {
+            $sum = bcadd($sum, $validated['values'][$i]['value']);
+        }
+        if (bccomp($sum, $validated['total']) !== 0)
+        {
+            return response()->json('Ошибка проверки контрольного значения', 400);
+        }
+
+        $arr = [];
+        foreach ($validated['values'] as $v) {
+            // пропускаем нулевые значения
+            if (bccomp((string)$v['value'],'0') === 0) {
+                continue;
+            }
+
+            $departmentId = null;
+            if(isset($v['moDepartmentId'])) {
+                $departmentId = (int)$v['moDepartmentId'];
+            }
+            $arr[] = new PlannedIndicatorChangeValueDto(
+                periodId: (int)$v['periodId'],
+                moId: (int)$v['moId'],
+                moDepartmentId: $departmentId,
+                plannedIndicatorId: (int)$v['plannedIndicatorId'],
+                value: (string)$v['value'],
+                userId: $userId
+            );
+        }
+        $collection = new PlannedIndicatorChangeValueCollectionDto(...$arr);
+
+        return new PlannedIndicatorChangeCollection($plannedIndicatorChangeService->incrementValues($collection)->value->toArray());
     }
 
     /**

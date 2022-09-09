@@ -6,6 +6,8 @@ namespace App\Services;
 use App\Exceptions\InitialDataNotFixedException;
 use App\Models\PlannedIndicator;
 use App\Models\PlannedIndicatorChange;
+use App\Services\Dto\PlannedIndicatorChangeValueCollectionDto;
+use App\Services\Dto\PlannedIndicatorChangeValueCollectionQueryResultDto;
 use App\Services\Dto\PlannedIndicatorChangeValueDto;
 use App\Services\Dto\PlannedIndicatorChangeValueQueryResultDto;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +22,11 @@ class PlannedIndicatorChangeService
     ) { }
 
     public function getByNodeIdAndYear(int $nodeId, int $year): array {
-        $ids = $this->nodeService->plannedIndicatorsForNodeId($nodeId);
+        return $this->getByNodeIdsAndYear([$nodeId],$year);
+    }
+
+    public function getByNodeIdsAndYear(array $nodeIds, int $year): array {
+        $ids = $this->nodeService->plannedIndicatorsForNodeIds($nodeIds);
         $periodIds = $this->periodService->getIdsByYear($year);
 
         $data = PlannedIndicatorChange::whereIn('period_id', $periodIds)->whereIn('planned_indicator_id',$ids)->orderBy('id')->get();
@@ -98,6 +104,60 @@ class PlannedIndicatorChangeService
             value: $change
         );
 
+        return $result;
+    }
+
+
+    public function incrementValues(PlannedIndicatorChangeValueCollectionDto $collection)
+    {
+        $arr = $collection->toArray();
+
+        // Проверяем, что данные доступны для редактирования.
+        foreach($arr as $dto) {
+            $plannedIndicator = PlannedIndicator::findOrFail($dto->plannedIndicatorId);
+            $year = $this->periodService->getYearById($dto->periodId);
+            if (!$this->initialDataFixingService->fixed($plannedIndicator->node_id, $year)) {
+                throw new InitialDataNotFixedException('Начальные данные для раздела не зафиксированны');
+            }
+        }
+
+        $entities = [];
+        foreach($arr as $dto) {
+            $plannedIndicatorChange = new PlannedIndicatorChange();
+            $plannedIndicatorChange->period_id = $dto->periodId;
+            $plannedIndicatorChange->mo_id = $dto->moId;
+            $plannedIndicatorChange->planned_indicator_id = $plannedIndicator->id;
+            // $initialData->algorithm_id = $algorithmId;
+            $plannedIndicatorChange->user_id = $dto->userId;
+            $plannedIndicatorChange->mo_department_id = $dto->moDepartmentId;
+            $plannedIndicatorChange->value = $dto->value;
+            $entities[] = $plannedIndicatorChange;
+        }
+        DB::transaction(function() use ($entities) {
+            foreach($entities as $plannedIndicatorChange) {
+                $plannedIndicatorChange->save();
+            }
+        });
+
+        $arr = [];
+        foreach($entities as $plannedIndicatorChange) {
+            $arr[] = new PlannedIndicatorChangeValueDto(
+                id: $plannedIndicatorChange->id,
+                periodId: $plannedIndicatorChange->period_id,
+                moId: $plannedIndicatorChange->mo_id,
+                plannedIndicatorId: $plannedIndicatorChange->planned_indicator_id,
+                moDepartmentId: $plannedIndicatorChange->mo_department_id,
+                value: $plannedIndicatorChange->value,
+                userId: $plannedIndicatorChange->user_id
+            );
+        }
+
+        $result = new PlannedIndicatorChangeValueCollectionQueryResultDto(
+            operationError: false,
+            operationMessage: '',
+            hasValue: true,
+            value: new PlannedIndicatorChangeValueCollectionDto(...$arr)
+        );
         return $result;
     }
 }

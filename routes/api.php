@@ -20,13 +20,13 @@ use App\Http\Controllers\UsedMedicalAssistanceTypeController;
 use App\Http\Controllers\UsedMedicalServicesController;
 use App\Http\Controllers\IndicatorsController;
 use App\Http\Controllers\InitialDataController;
+use App\Http\Controllers\InitialDataLoadedController;
 use App\Http\Controllers\PeriodController;
 use App\Http\Controllers\PlannedIndicatorChangeController;
 use App\Http\Controllers\PlannedIndicatorController;
 use App\Http\Controllers\UsedCareProfilesController;
 use App\Http\Controllers\VmpGroupController;
 use App\Http\Controllers\VmpTypesController;
-use App\Models\VmpGroup;
 
 /*
 |--------------------------------------------------------------------------
@@ -61,6 +61,7 @@ Route::group(array('prefix' => 'v1'), function()
         Route::get('/used-medical-services', [UsedMedicalServicesController::class, 'medicalServicesUsedForNodeId']);
         Route::get('/used-care-profiles',[UsedCareProfilesController::class, 'careProfilesUsedForNodeId']);
         Route::apiResource('node-init-data', InitialDataController::class);
+        Route::apiResource('init-data-loaded-nodes', InitialDataLoadedController::class);
         Route::apiResource('care-profiles', CareProfilesController::class);
         Route::apiResource('vmp-types', VmpTypesController::class);
         Route::apiResource('vmp-groups', VmpGroupController::class);
@@ -69,6 +70,7 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('category-tree-nodes', CategoryTreeNodesController::class);
         Route::apiResource('categories', CategoryController::class);
         Route::apiResource('planned-indicator-change', PlannedIndicatorChangeController::class);
+        Route::post('/planned-indicator-change-add-values', [PlannedIndicatorChangeController::class, 'incrementValues']);
         Route::apiResource('periods', PeriodController::class);
     });
 

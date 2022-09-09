@@ -17,7 +17,8 @@ class CategoryTreeNodesResource extends JsonResource
         return [
             'id' => $this->id,
             'category_id' => $this->category_id,
-            'parent_id' => $this->parent_id
+            'parent_id' => $this->parent_id,
+            'slug' => $this->slug
         ];
     }
 }
