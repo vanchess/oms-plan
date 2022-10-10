@@ -11,7 +11,7 @@ class PlannedIndicatorChangeValueDto
         public int $plannedIndicatorId,
         public string $value,
         public int $userId,
-        public ?int $commitId = null,
+        public ?int $packageId = null,
         public ?int $moDepartmentId = null,
         public ?int $id = null,
     ) { }

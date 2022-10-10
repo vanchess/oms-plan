@@ -95,8 +95,6 @@ class MedicalServicesEnum {
         public const FetalUltrasound = 12;
 }
 
-Route::get('/category-tree/{rootNodeId}', [CategoryTreeController::class, 'getCategorySqlTreeStructure']);
-
 Route::get('/321123', function (InitialDataService $initialDataService) {
 
     $nodeId = 4;

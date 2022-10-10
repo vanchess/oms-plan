@@ -8,6 +8,8 @@ use App\Http\Controllers\CareProfilesController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CategoryTreeController;
 use App\Http\Controllers\CategoryTreeNodesController;
+use App\Http\Controllers\ChangePackageController;
+use App\Http\Controllers\CommissionDecisionController;
 use App\Http\Controllers\MedicalInstitutionController;
 use App\Http\Controllers\MedicalInstitutionDepartmentController;
 use App\Http\Controllers\MedicalInstitutionIdsController;
@@ -72,6 +74,8 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('planned-indicator-change', PlannedIndicatorChangeController::class);
         Route::post('/planned-indicator-change-add-values', [PlannedIndicatorChangeController::class, 'incrementValues']);
         Route::apiResource('periods', PeriodController::class);
+        Route::apiResource('commission-decision', CommissionDecisionController::class);
+        Route::apiResource('change-package', ChangePackageController::class);
     });
 
 

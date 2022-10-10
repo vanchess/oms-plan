@@ -13,15 +13,15 @@ class PeopleAssignedInfoForContractService
         private PeriodService $periodService
     ) {}
 
-    public function GetJson(int $year, int $commitId = null): string {
-        return $this->CreateData($year, $commitId)->toJson();
+    public function GetJson(int $year, int $packageId = null): string {
+        return $this->CreateData($year, $packageId)->toJson();
     }
 
-    public function GetArray(int $year, int $commitId = null): array {
-        return $this->CreateData($year, $commitId)->toArray();
+    public function GetArray(int $year, int $packageId = null): array {
+        return $this->CreateData($year, $packageId)->toArray();
     }
 
-    private function CreateData(int $year, int $commitId = null) {
+    private function CreateData(int $year, int $packageId = null) {
         $indicatorIds = [10];
 
         $hospitalNodeIds = [35];
@@ -36,8 +36,8 @@ class PeopleAssignedInfoForContractService
         $dataSql = DB::table((new PlannedIndicator())->getTable().' as pi')
         ->selectRaw('SUM(value) as value, node_id, indicator_id, mo_id, planned_indicator_id, mo_department_id')
         ->leftJoin((new PlannedIndicatorChange())->getTable().' as pic', 'pi.id', '=', 'pic.planned_indicator_id');
-        if ($commitId) {
-            $dataSql = $dataSql->where('commit_id','<=',$commitId);
+        if ($packageId) {
+            $dataSql = $dataSql->where('package_id','<=',$packageId);
         }
         //
         $dataSql = $dataSql->whereIn('indicator_id', $indicatorIds)

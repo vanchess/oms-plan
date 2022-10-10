@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Exceptions\InitialDataIsFixedException;
-use App\Models\DataCommit;
+use App\Models\ChangePackage;
 use App\Models\InitialDataLoaded;
 
 class InitialDataFixingService
@@ -40,20 +40,20 @@ class InitialDataFixingService
             throw new InitialDataIsFixedException('Начальные данные для данного раздела уже зафиксированны');
         }
 
-        $dataCommit = new DataCommit();
-        $dataCommit->user_id = $userId;
-        $dataCommit->save();
-        $dataCommitId = $dataCommit->id;
+        $changePackage = new ChangePackage();
+        $changePackage->user_id = $userId;
+        $changePackage->save();
+        $changePackageId = $changePackage->id;
 
         // Помечаем начальные данные для указанного узла(и дочерних) как загруженные
-        $this->markLoaded($nodeIds, $year, $dataCommitId, $userId);
+        $this->markLoaded($nodeIds, $year, $changePackageId, $userId);
         // Формируем "базовые" изменения на основе начальных данных
         $this->plannedIndicatorChangeInitService->fromInitialData($year);
         // Указываем идентификатор фиксации данных для "базовых" изменений
-        $this->plannedIndicatorChangeCommitService->commitByNodeIds($nodeIds, $year, $dataCommitId);
+        $this->plannedIndicatorChangeCommitService->commitByNodeIds($nodeIds, $year, $changePackageId);
     }
 
-    private function markLoaded(array $nodeIds, int $year, int $commitId, int $userId)
+    private function markLoaded(array $nodeIds, int $year, int $packageId, int $userId)
     {
         $arr = [];
         foreach($nodeIds as $nodeId) {
@@ -61,7 +61,7 @@ class InitialDataFixingService
             $l->year = $year;
             $l->node_id = $nodeId;
             $l->user_id= $userId;
-            $l->commit_id = $commitId;
+            $l->package_id = $packageId;
             $arr[] = $l->attributesToArray();
         }
         InitialDataLoaded::Insert($arr);

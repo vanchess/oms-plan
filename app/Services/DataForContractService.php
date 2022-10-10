@@ -14,21 +14,21 @@ class DataForContractService
         private PeriodService $periodService
     ) {}
 
-    public function GetJson(int $year, int $commitId = null): string {
-        return $this->CreateData($year, $commitId)->toJson();
+    public function GetJson(int $year, int $packageId = null): string {
+        return $this->CreateData($year, $packageId)->toJson();
     }
 
-    public function GetArray(int $year, int $commitId = null): array {
-        return $this->CreateData($year, $commitId)->toArray();
+    public function GetArray(int $year, int $packageId = null): array {
+        return $this->CreateData($year, $packageId)->toArray();
     }
 
-    public function GetArrayByYearAndMonth(int $year, int $monthNum, int $commitId = null): array {
-        return $this->CreateDataByYearAndMonth($year, $monthNum, $commitId)->toArray();
+    public function GetArrayByYearAndMonth(int $year, int $monthNum, int $packageId = null): array {
+        return $this->CreateDataByYearAndMonth($year, $monthNum, $packageId)->toArray();
     }
 
-    private function CreateData(int $year, int $commitId = null) {
+    private function CreateData(int $year, int $packageId = null) {
         $periodIds = $this->periodService->getIdsByYear($year);
-        $data = $this->CreateDataByPeriodIds($periodIds, $commitId);
+        $data = $this->CreateDataByPeriodIds($periodIds, $packageId);
 
         return collect([
             'year' => $year,
@@ -36,16 +36,16 @@ class DataForContractService
         ]);
     }
 
-    private function CreateDataByYearAndMonth(int $year, int $monthNum, int $commitId = null) {
+    private function CreateDataByYearAndMonth(int $year, int $monthNum, int $packageId = null) {
         $periodIds = $this->periodService->getIdsByYearAndMonth($year, $monthNum);
-        $data = $this->CreateDataByPeriodIds($periodIds, $commitId);
+        $data = $this->CreateDataByPeriodIds($periodIds, $packageId);
 
         return collect([
             'mo' => $data
         ]);
     }
 
-    private function CreateDataByPeriodIds(array $periodIds, int $commitId = null) {
+    private function CreateDataByPeriodIds(array $periodIds, int $packageId = null) {
         $indicatorIds = [2, 4, 5, 6, 7, 8, 9];
 
         $hospitalNodeIds = [1,2,3,4,5,6,7];
@@ -67,8 +67,8 @@ class DataForContractService
         ->selectRaw('SUM(value) as value, node_id, indicator_id, service_id, profile_id, assistance_type_id, care_profile_id, vmp_group_id, vmp_type_id, mo_id, planned_indicator_id, mo_department_id')
         //->leftJoin((new Indicator())->getTable().' as ind','pi.indicator_id','=','ind.id')
         ->leftJoin((new PlannedIndicatorChange())->getTable().' as pic', 'pi.id', '=', 'pic.planned_indicator_id');
-        if ($commitId) {
-            $dataSql = $dataSql->where('commit_id','<=',$commitId);
+        if ($packageId) {
+            $dataSql = $dataSql->where('package_id','<=',$packageId);
         }
         //
         $dataSql = $dataSql->whereIn('indicator_id', $indicatorIds)

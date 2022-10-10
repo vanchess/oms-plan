@@ -22,7 +22,7 @@ class PlannedIndicatorChangeResource extends JsonResource
             'user_id' => $this->userId,
             'value' => str_contains($this->value,'.')?rtrim(rtrim($this->value,'0'),'.'):$this->value,
             'mo_department_id' => $this->moDepartmentId,
-            'commit_id' => $this->commitId
+            'package_id' => $this->packageId
             //'created_at' => $this->created_at,
         ];
     }

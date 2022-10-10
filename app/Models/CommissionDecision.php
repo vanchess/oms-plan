@@ -6,9 +6,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class DataCommit extends Model
+class CommissionDecision extends Model
 {
+    //use HasFactory;
     use SoftDeletes;
 
-    protected $table ='tbl_committed_changes';
+    protected $table = 'tbl_commission_decisions';
+
+    protected $casts = [
+        'date' => 'date',
+    ];
 }

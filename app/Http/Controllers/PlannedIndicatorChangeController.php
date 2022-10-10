@@ -93,6 +93,7 @@ class PlannedIndicatorChangeController extends Controller
             'values.*.moId' => 'required|integer',
             'values.*.moDepartmentId' => 'integer',
             'values.*.plannedIndicatorId' => 'required|integer',
+            'values.*.packageId' => 'integer',
             'values.*.value' => ['required', new BCMathString],
             'total' => ['required', new BCMathString],
         ]);
@@ -126,6 +127,7 @@ class PlannedIndicatorChangeController extends Controller
                 moId: (int)$v['moId'],
                 moDepartmentId: $departmentId,
                 plannedIndicatorId: (int)$v['plannedIndicatorId'],
+                packageId: (int)$v['packageId'],
                 value: (string)$v['value'],
                 userId: $userId
             );

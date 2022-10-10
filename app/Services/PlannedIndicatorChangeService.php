@@ -41,7 +41,7 @@ class PlannedIndicatorChangeService
                 plannedIndicatorId: $e->planned_indicator_id,
                 value: $e->value,
                 userId: $e->user_id,
-                commitId: $e->commit_id
+                packageId: $e->package_id
             ));
         });
         return $data->all();//->toArray();//
@@ -131,6 +131,7 @@ class PlannedIndicatorChangeService
             $plannedIndicatorChange->user_id = $dto->userId;
             $plannedIndicatorChange->mo_department_id = $dto->moDepartmentId;
             $plannedIndicatorChange->value = $dto->value;
+            $plannedIndicatorChange->package_id = $dto->packageId;
             $entities[] = $plannedIndicatorChange;
         }
         DB::transaction(function() use ($entities) {
@@ -147,6 +148,7 @@ class PlannedIndicatorChangeService
                 moId: $plannedIndicatorChange->mo_id,
                 plannedIndicatorId: $plannedIndicatorChange->planned_indicator_id,
                 moDepartmentId: $plannedIndicatorChange->mo_department_id,
+                packageId: $plannedIndicatorChange->package_id,
                 value: $plannedIndicatorChange->value,
                 userId: $plannedIndicatorChange->user_id
             );

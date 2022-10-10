@@ -16,7 +16,7 @@ class InitialDataLoaded extends Model
         'year',
         'node_id',
         'user_id',
-        'commit_id',
+        'package_id',
         'created_at',
         'updated_at',
     ];

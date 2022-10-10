@@ -15,20 +15,20 @@ class PlannedIndicatorChangeCommitService
     /**
      * Зафиксировать текущее изменения для указанного узла(категории) и его потомков
      */
-    public function commitByNodeId(int $nodeId, int $year, int $commitId) {
+    public function commitByNodeId(int $nodeId, int $year, int $packageId) {
         $nodeIds = $this->nodeService->nodeWithChildrenIds($nodeId);
-        $this->commitByNodeIds($nodeIds, $year, $commitId);
+        $this->commitByNodeIds($nodeIds, $year, $packageId);
     }
 
     /**
      * Зафиксировать текущее изменения для указанных узлов(категорий)
      */
-    public function commitByNodeIds(array $nodeIds, int $year, int $commitId) {
+    public function commitByNodeIds(array $nodeIds, int $year, int $packageId) {
         $periodIds = $this->periodService->getIdsByYear($year);
         $plannedIndicatorIds = $this->nodeService->plannedIndicatorsForNodeIds($nodeIds);
-        PlannedIndicatorChange::whereNull('commit_id')
+        PlannedIndicatorChange::whereNull('package_id')
             ->whereIn('period_id',$periodIds)
             ->whereIn('planned_indicator_id', $plannedIndicatorIds)
-            ->update(['commit_id' => $commitId]);
+            ->update(['package_id' => $packageId]);
     }
 }
