@@ -16,4 +16,9 @@ class CommissionDecision extends Model
     protected $casts = [
         'date' => 'date',
     ];
+
+    public function changePackage()
+    {
+        return $this->hasMany(ChangePackage::class, 'commission_decision_id', 'id');
+    }
 }

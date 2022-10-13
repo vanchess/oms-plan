@@ -13,15 +13,15 @@ class PeopleAssignedInfoForContractService
         private PeriodService $periodService
     ) {}
 
-    public function GetJson(int $year, int $packageId = null): string {
-        return $this->CreateData($year, $packageId)->toJson();
+    public function GetJson(int $year, array $packageIds = null): string {
+        return $this->CreateData($year, $packageIds)->toJson();
     }
 
-    public function GetArray(int $year, int $packageId = null): array {
-        return $this->CreateData($year, $packageId)->toArray();
+    public function GetArray(int $year, array $packageIds = null): array {
+        return $this->CreateData($year, $packageIds)->toArray();
     }
 
-    private function CreateData(int $year, int $packageId = null) {
+    private function CreateData(int $year, array $packageIds = null) {
         $indicatorIds = [10];
 
         $hospitalNodeIds = [35];
@@ -36,8 +36,8 @@ class PeopleAssignedInfoForContractService
         $dataSql = DB::table((new PlannedIndicator())->getTable().' as pi')
         ->selectRaw('SUM(value) as value, node_id, indicator_id, mo_id, planned_indicator_id, mo_department_id')
         ->leftJoin((new PlannedIndicatorChange())->getTable().' as pic', 'pi.id', '=', 'pic.planned_indicator_id');
-        if ($packageId) {
-            $dataSql = $dataSql->where('package_id','<=',$packageId);
+        if ($packageIds) {
+            $dataSql = $dataSql->whereIn('package_id',$packageIds);
         }
         //
         $dataSql = $dataSql->whereIn('indicator_id', $indicatorIds)

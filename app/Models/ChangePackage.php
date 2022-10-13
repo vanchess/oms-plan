@@ -11,4 +11,8 @@ class ChangePackage extends Model
     use SoftDeletes;
 
     protected $table ='tbl_change_package';
+
+    public function commissionDecision() {
+        return $this->belongsTo(CommissionDecision::class, 'commission_decision_id', 'id');
+    }
 }
