@@ -2528,7 +2528,7 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
         $bedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
         $v = 0;
         foreach ($bedProfiles as $bp) {
-            $v += $bp[$indicatorId];
+            $v += ($bp[$indicatorId] ?? 0);
         }
 
         $sheet->setCellValue([7,$rowIndex], $v);
