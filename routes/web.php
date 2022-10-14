@@ -2928,54 +2928,69 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
 });
 
 
-Route::get('/', function (DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService) {
+Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
+    $packageIds = null;
+    $protocolNumber = 0;
+    $protocolDate = '';
+    if ($commissionDecisionsId) {
+        $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
+        $cd = $commissionDecisions->find($commissionDecisionsId);
+        $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
+        $protocolNumber = $cd->number;
+        $protocolDate = $cd->date->format('d.m.Y');
+        $docName = "к протоколу заседания комиссии по разработке территориальной программы ОМС Курганской области от $protocolDate";
+        $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+    } else {
+        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+    }
     // InitialChanges::dispatch(2022);
     // InitialDataLoaded::dispatch(2, 2022, 1);
     // InitialDataLoaded::dispatch(9, 2022, 1);
 
-    $year = 2022;
-    $commit = null;
+    //$year = 2022;
+    //$commit = null;
     $strDateTimeNow = date("Y-m-d-His");
+    $path =  $year.DIRECTORY_SEPARATOR.$protocolNumber.'('.$protocolDate.')'.DIRECTORY_SEPARATOR.$strDateTimeNow.DIRECTORY_SEPARATOR;
 
     $indicators = Indicator::select('id','name')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'indicators.json', $indicators);
+    Storage::put($path.'indicators.json', $indicators);
 
     $medicalServices = MedicalServices::select('id','name')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'medicalServices.json', $medicalServices);
+    Storage::put($path.'medicalServices.json', $medicalServices);
 
     $medicalAssistanceType = MedicalAssistanceType::select('id','name')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'medicalAssistanceType.json', $medicalAssistanceType);
+    Storage::put($path.'medicalAssistanceType.json', $medicalAssistanceType);
 
     $hospitalBedProfiles = HospitalBedProfiles::select('tbl_hospital_bed_profiles.id','name', 'care_profile_foms_id')
     ->join('tbl_hospital_bed_profile_care_profile_foms',  'tbl_hospital_bed_profiles.id', '=', 'hospital_bed_profile_id')
     ->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'hospitalBedProfiles.json', $hospitalBedProfiles);
+    Storage::put($path.'hospitalBedProfiles.json', $hospitalBedProfiles);
 
     $vmpGroup = VmpGroup::select('id','code')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'vmpGroup.json', $vmpGroup);
+    Storage::put($path.'vmpGroup.json', $vmpGroup);
 
     $vmpTypes = VmpTypes::select('id','name')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'vmpTypes.json', $vmpTypes);
+    Storage::put($path.'vmpTypes.json', $vmpTypes);
 
     $careProfiles = CareProfiles::select('tbl_care_profiles.id','name','care_profile_foms_id')
     ->join('tbl_care_profile_care_profile_foms',  'tbl_care_profiles.id', '=', 'care_profile_id')
     ->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'careProfiles.json', $careProfiles);
+    Storage::put($path.'careProfiles.json', $careProfiles);
 
     $careProfilesFoms = CareProfilesFoms::select('id', 'name', 'code_v002 as code')
     ->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'careProfilesFoms.json', $careProfilesFoms);
+    Storage::put($path.'careProfilesFoms.json', $careProfilesFoms);
 
     $mo = $moInfoForContractService->GetJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'mo.json', $mo);
+    Storage::put($path.'mo.json', $mo);
 
     $moDepartments = $moDepartmentsInfoForContractService->GetJson();
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'moDepartments.json', $moDepartments);
+    Storage::put($path.'moDepartments.json', $moDepartments);
 
-    $content = $dataForContractService->GetJson($year, $commit);
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'data.json', $content);
+    $content = $dataForContractService->GetJson($year, $packageIds);
+    Storage::put($path.'data.json', $content);
 
-    $content = $peopleAssignedInfoForContractService->GetJson($year, $commit);
-    Storage::put( $strDateTimeNow.DIRECTORY_SEPARATOR.'peopleAssignedData.json', $content);
+    $content = $peopleAssignedInfoForContractService->GetJson($year, null);
+    Storage::put($path.'peopleAssignedData.json', $content);
     return $content;
 });
