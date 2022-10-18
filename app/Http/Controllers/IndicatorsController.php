@@ -17,7 +17,7 @@ class IndicatorsController extends Controller
      */
     public function index()
     {
-        return new IndicatorCollection(Indicator::all());//->paginate($perPage));
+        return new IndicatorCollection(Indicator::OrderBy('order')->get());//->paginate($perPage));
     }
 
     /**

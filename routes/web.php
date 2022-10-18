@@ -1610,7 +1610,7 @@ Route::get('/vitacore', function (DataForContractService $dataForContractService
             $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
             $v = 0;
             foreach ($bedProfiles as $bp) {
-                $v += $bp[$indicatorId];
+                $v += $bp[$indicatorId] ?? 0;
             }
             $sheet->setCellValue([$curColumn,$curRow], $v);
             $rowOffset++;
@@ -1749,12 +1749,12 @@ Route::get('/vitacore', function (DataForContractService $dataForContractService
             $v = 0;
             $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
             foreach ($bedProfiles as $bp) {
-                $v += $bp[$indicatorId];
+                $v += $bp[$indicatorId] ?? 0;
             }
 
             $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
             foreach ($bedProfiles as $bp) {
-                $v += $bp[$indicatorId];
+                $v += $bp[$indicatorId] ?? 0;
             }
             $sheet->setCellValue([$curColumn,$curRow], $v);
             $rowOffset++;
