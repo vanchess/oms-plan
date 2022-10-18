@@ -2518,6 +2518,7 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
     $rowIndex = 6;
     $category = 'hospital';
     $indicatorId = 7; // госпитализаций
+    $rehabilitationBedProfileId = 32; // реабилитационные соматические;
     foreach($moCollection as $mo) {
         $ordinalRowNum++;
         $rowIndex++;
@@ -2527,7 +2528,10 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
 
         $bedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
         $v = 0;
-        foreach ($bedProfiles as $bp) {
+        foreach ($bedProfiles as $bpId => $bp) {
+            if($bpId === $rehabilitationBedProfileId) {
+                continue;
+            }
             $v += ($bp[$indicatorId] ?? 0);
         }
 
