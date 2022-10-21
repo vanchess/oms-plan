@@ -2159,7 +2159,7 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
     bcscale(4);
 
     $content = $dataForContractService->GetArray($year, $packageIds);
-    $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, null);
+    $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, $packageIds);
     $moCollection = MedicalInstitution::orderBy('order')->get();
 
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
@@ -2755,7 +2755,7 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
     $indicatorId = 4; // стоимость
 
     $content = $dataForContractService->GetArray($year, $packageIds);
-    $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, null);
+    $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, $packageIds);
     $moCollection = MedicalInstitution::orderBy('order')->get();
 
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
@@ -2994,7 +2994,7 @@ Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService 
     $content = $dataForContractService->GetJson($year, $packageIds);
     Storage::put($path.'data.json', $content);
 
-    $content = $peopleAssignedInfoForContractService->GetJson($year, null);
+    $content = $peopleAssignedInfoForContractService->GetJson($year, $packageIds);
     Storage::put($path.'peopleAssignedData.json', $content);
     return $content;
 });
