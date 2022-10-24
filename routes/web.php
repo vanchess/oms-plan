@@ -2932,6 +2932,296 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
 });
 
 
+Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+    $packageIds = null;
+    if ($commissionDecisionsId) {
+        $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
+        $cd = $commissionDecisions->find($commissionDecisionsId);
+        $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
+        $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+    } else {
+        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+    }
+    $path = 'xlsx';
+    $resultFileName = 'hospital.xlsx';
+    $strDateTimeNow = date("Y-m-d-His");
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $fullResultFilepath = Storage::path($resultFilePath);
+
+    bcscale(4);
+
+    $content = $dataForContractService->GetArray($year, $packageIds);
+
+    $moCollection = MedicalInstitution::orderBy('order')->get();
+
+    $careProfilesFoms = CareProfilesFoms::all();
+
+    $spreadsheet = new Spreadsheet();
+    $startRow = 1;
+    $startColoumn = 1;
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('ДС при стационаре');
+
+    $ordinalRowNum = 0;
+    $rowIndex = $startRow + 2;
+    $tableHeadRow = $startRow;
+    $coloumnIndex = $startColoumn;
+    $category = 'hospital';
+
+    $numberOfBedsIndicatorId = 1; // число коек
+    $casesOfTreatmentIndicatorId = 2; // случаев лечения
+    $patientDaysIndicatorId = 3; // пациенто-дней
+    $costIndicatorId = 4; // стоимость
+
+    $profilesIndex = 0;
+    foreach ($careProfilesFoms as $cpf) {
+        $d = (4 * $profilesIndex) + 2;
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], "Койки");
+        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 1], "Объемы, случаев лечения");
+        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 1], "Объемы, пациенто-дней");
+        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 1], "Финансовое обеспечение, руб.");
+        $profilesIndex++;
+    }
+    foreach($moCollection as $mo) {
+        $coloumnIndex = $startColoumn;
+
+        $inHospitalBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
+
+        if (!$inHospitalBedProfiles) { continue; }
+
+        $ordinalRowNum++;
+
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
+
+        foreach ($careProfilesFoms as $cpf) {
+            $numberOfBeds = '0';
+            $casesOfTreatment = '0';
+            $patientDays = '0';
+            $cost = '0';
+
+            $hbp = $cpf->hospitalBedProfiles;
+            foreach($hbp as $bp) {
+                $bpData = $inHospitalBedProfiles[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
+                $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
+                $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $numberOfBeds);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $casesOfTreatment);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $patientDays);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $cost);
+        }
+        $rowIndex++;
+    }
+
+
+    $spreadsheet->createSheet();
+    $spreadsheet->setActiveSheetIndex(1);
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('ДС при поликлинике');
+
+    $ordinalRowNum = 0;
+    $rowIndex = $startRow + 2;
+    $tableHeadRow = $startRow;
+    $coloumnIndex = $startColoumn;
+    $category = 'hospital';
+
+    $numberOfBedsIndicatorId = 1; // число коек
+    $casesOfTreatmentIndicatorId = 2; // случаев лечения
+    $patientDaysIndicatorId = 3; // пациенто-дней
+    $costIndicatorId = 4; // стоимость
+
+    $profilesIndex = 0;
+    foreach ($careProfilesFoms as $cpf) {
+        $d = (4 * $profilesIndex) + 2;
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], "Койки");
+        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 1], "Объемы, случаев лечения");
+        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 1], "Объемы, пациенто-дней");
+        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 1], "Финансовое обеспечение, руб.");
+        $profilesIndex++;
+    }
+    foreach($moCollection as $mo) {
+        $coloumnIndex = $startColoumn;
+
+        $inPolyclinicBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
+
+        if (!$inPolyclinicBedProfiles) { continue; }
+
+        $ordinalRowNum++;
+
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
+
+        foreach ($careProfilesFoms as $cpf) {
+            $numberOfBeds = '0';
+            $casesOfTreatment = '0';
+            $patientDays = '0';
+            $cost = '0';
+
+            $hbp = $cpf->hospitalBedProfiles;
+            foreach($hbp as $bp) {
+                $bpData = $inPolyclinicBedProfiles[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
+                $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
+                $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $numberOfBeds);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $casesOfTreatment);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $patientDays);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $cost);
+        }
+        $rowIndex++;
+    }
+
+
+    $spreadsheet->createSheet();
+    $spreadsheet->setActiveSheetIndex(2);
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('КС');
+
+    $ordinalRowNum = 0;
+    $rowIndex = $startRow + 2;
+    $tableHeadRow = $startRow;
+    $coloumnIndex = $startColoumn;
+    $category = 'hospital';
+
+    $numberOfBedsIndicatorId = 1; // число коек
+    $casesOfTreatmentIndicatorId = 7; // госпитализаций
+    $patientDaysIndicatorId = 3; // пациенто-дней
+    $costIndicatorId = 4; // стоимость
+
+    $profilesIndex = 0;
+    foreach ($careProfilesFoms as $cpf) {
+        $d = (4 * $profilesIndex) + 2;
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], "Койки");
+        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 1], "Объемы, госпитализаций");
+        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 1], "Объемы, койко-дней");
+        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 1], "Финансовое обеспечение, руб.");
+        $profilesIndex++;
+    }
+    foreach($moCollection as $mo) {
+        $coloumnIndex = $startColoumn;
+
+        $regularBedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
+
+        if (!$regularBedProfiles) { continue; }
+
+        $ordinalRowNum++;
+
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
+
+        foreach ($careProfilesFoms as $cpf) {
+            $numberOfBeds = '0';
+            $casesOfTreatment = '0';
+            $patientDays = '0';
+            $cost = '0';
+
+            $hbp = $cpf->hospitalBedProfiles;
+            foreach($hbp as $bp) {
+                $bpData = $regularBedProfiles[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
+                $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
+                $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $numberOfBeds);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $casesOfTreatment);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $patientDays);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $cost);
+        }
+        $rowIndex++;
+    }
+
+    $spreadsheet->createSheet();
+    $spreadsheet->setActiveSheetIndex(3);
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('ВМП');
+
+    $ordinalRowNum = 0;
+    $rowIndex = $startRow + 2;
+    $tableHeadRow = $startRow;
+    $coloumnIndex = $startColoumn;
+    $category = 'hospital';
+
+    $numberOfBedsIndicatorId = 1; // число коек
+    $casesOfTreatmentIndicatorId = 7; // госпитализаций
+    $patientDaysIndicatorId = 3; // пациенто-дней
+    $costIndicatorId = 4; // стоимость
+
+    $profilesIndex = 0;
+    foreach ($careProfilesFoms as $cpf) {
+        $d = (4 * $profilesIndex) + 2;
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], "Койки");
+        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 1], "Объемы, госпитализаций");
+        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 1], "Объемы, койко-дней");
+        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 1], "Финансовое обеспечение, руб.");
+        $profilesIndex++;
+    }
+    foreach($moCollection as $mo) {
+        $coloumnIndex = $startColoumn;
+
+        $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
+
+        if (!$careProfiles) { continue; }
+
+        $ordinalRowNum++;
+
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
+
+        foreach ($careProfilesFoms as $cpf) {
+            $numberOfBeds = '0';
+            $casesOfTreatment = '0';
+            $patientDays = '0';
+            $cost = '0';
+
+            $cpmz = $cpf->careProfilesMz;
+            foreach($cpmz as $cp) {
+                $vmpGroupsData = $careProfiles[$cp->id] ?? null;
+                if (!$vmpGroupsData) { continue; }
+
+                foreach ($vmpGroupsData as $vmpTypes) {
+                    foreach ($vmpTypes as $vmpT)
+                    {
+                        $numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
+                        $casesOfTreatment = bcadd($casesOfTreatment, $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
+                        $patientDays = bcadd($patientDays, $vmpT[$patientDaysIndicatorId] ?? '0');
+                        $cost = bcadd($cost, $vmpT[$costIndicatorId] ?? '0');
+                    }
+                }
+            }
+
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $numberOfBeds);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $casesOfTreatment);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $patientDays);
+            $sheet->setCellValue([$coloumnIndex++, $rowIndex], $cost);
+        }
+        $rowIndex++;
+    }
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save($fullResultFilepath);
+    return Storage::download($resultFilePath);
+});
+
+
 Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $protocolNumber = 0;
