@@ -2963,7 +2963,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $sheet->setTitle('ДС при стационаре');
 
     $ordinalRowNum = 0;
-    $rowIndex = $startRow + 2;
+    $rowIndex = $startRow + 3;
     $tableHeadRow = $startRow;
     $coloumnIndex = $startColoumn;
     $category = 'hospital';
@@ -2975,12 +2975,13 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
 
     $profilesIndex = 0;
     foreach ($careProfilesFoms as $cpf) {
-        $d = (4 * $profilesIndex) + 2;
+        $d = (4 * $profilesIndex) + 3;
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
-        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], "Койки");
-        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 1], "Объемы, случаев лечения");
-        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 1], "Объемы, пациенто-дней");
-        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 1], "Финансовое обеспечение, руб.");
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], $cpf->code_v002);
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 2], "Койки");
+        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 2], "Объемы, случаев лечения");
+        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 2], "Объемы, пациенто-дней");
+        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 2], "Финансовое обеспечение, руб.");
         $profilesIndex++;
     }
     foreach($moCollection as $mo) {
@@ -2993,6 +2994,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $ordinalRowNum++;
 
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->code);
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
 
         foreach ($careProfilesFoms as $cpf) {
@@ -3027,7 +3029,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $sheet->setTitle('ДС при поликлинике');
 
     $ordinalRowNum = 0;
-    $rowIndex = $startRow + 2;
+    $rowIndex = $startRow + 3;
     $tableHeadRow = $startRow;
     $coloumnIndex = $startColoumn;
     $category = 'hospital';
@@ -3039,12 +3041,13 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
 
     $profilesIndex = 0;
     foreach ($careProfilesFoms as $cpf) {
-        $d = (4 * $profilesIndex) + 2;
+        $d = (4 * $profilesIndex) + 3;
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
-        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], "Койки");
-        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 1], "Объемы, случаев лечения");
-        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 1], "Объемы, пациенто-дней");
-        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 1], "Финансовое обеспечение, руб.");
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], $cpf->code_v002);
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 2], "Койки");
+        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 2], "Объемы, случаев лечения");
+        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 2], "Объемы, пациенто-дней");
+        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 2], "Финансовое обеспечение, руб.");
         $profilesIndex++;
     }
     foreach($moCollection as $mo) {
@@ -3057,6 +3060,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $ordinalRowNum++;
 
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->code);
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
 
         foreach ($careProfilesFoms as $cpf) {
@@ -3091,7 +3095,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $sheet->setTitle('КС');
 
     $ordinalRowNum = 0;
-    $rowIndex = $startRow + 2;
+    $rowIndex = $startRow + 3;
     $tableHeadRow = $startRow;
     $coloumnIndex = $startColoumn;
     $category = 'hospital';
@@ -3103,12 +3107,13 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
 
     $profilesIndex = 0;
     foreach ($careProfilesFoms as $cpf) {
-        $d = (4 * $profilesIndex) + 2;
+        $d = (4 * $profilesIndex) + 3;
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
-        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], "Койки");
-        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 1], "Объемы, госпитализаций");
-        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 1], "Объемы, койко-дней");
-        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 1], "Финансовое обеспечение, руб.");
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], $cpf->code_v002);
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 2], "Койки");
+        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 2], "Объемы, госпитализаций");
+        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 2], "Объемы, койко-дней");
+        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 2], "Финансовое обеспечение, руб.");
         $profilesIndex++;
     }
     foreach($moCollection as $mo) {
@@ -3121,6 +3126,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $ordinalRowNum++;
 
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->code);
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
 
         foreach ($careProfilesFoms as $cpf) {
@@ -3154,7 +3160,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $sheet->setTitle('ВМП');
 
     $ordinalRowNum = 0;
-    $rowIndex = $startRow + 2;
+    $rowIndex = $startRow + 3;
     $tableHeadRow = $startRow;
     $coloumnIndex = $startColoumn;
     $category = 'hospital';
@@ -3166,12 +3172,13 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
 
     $profilesIndex = 0;
     foreach ($careProfilesFoms as $cpf) {
-        $d = (4 * $profilesIndex) + 2;
+        $d = (4 * $profilesIndex) + 3;
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
-        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], "Койки");
-        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 1], "Объемы, госпитализаций");
-        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 1], "Объемы, койко-дней");
-        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 1], "Финансовое обеспечение, руб.");
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], $cpf->code_v002);
+        $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 2], "Койки");
+        $sheet->setCellValue([$coloumnIndex + $d + 1, $tableHeadRow + 2], "Объемы, госпитализаций");
+        $sheet->setCellValue([$coloumnIndex + $d + 2, $tableHeadRow + 2], "Объемы, койко-дней");
+        $sheet->setCellValue([$coloumnIndex + $d + 3, $tableHeadRow + 2], "Финансовое обеспечение, руб.");
         $profilesIndex++;
     }
     foreach($moCollection as $mo) {
@@ -3184,6 +3191,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $ordinalRowNum++;
 
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->code);
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
 
         foreach ($careProfilesFoms as $cpf) {
