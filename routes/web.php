@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /*
@@ -717,8 +718,6 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
 });
 
 Route::get('/vitacore', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService) {
-    $path = 'xlsx';
-
     $months = [
         1 => 'Январь',
         2 => 'Февраль',
@@ -734,6 +733,7 @@ Route::get('/vitacore', function (DataForContractService $dataForContractService
         12 => 'Декабрь',
     ];
 
+    $path = 'xlsx';
     $resultFileName = 'vitacore.xlsx';
     $strDateTimeNow = date("Y-m-d-His");
     $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
@@ -1660,7 +1660,7 @@ Route::get('/vitacore', function (DataForContractService $dataForContractService
             foreach ($careProfiles as $vmpGroups) {
                 foreach ($vmpGroups as $vmpTypes) {
                     foreach ($vmpTypes as $vmpT)
-                    $v += $vmpT[$indicatorId];
+                    $v += ($vmpT[$indicatorId] ?? 0);
                 }
             }
             $sheet->setCellValue([$curColumn,$curRow], $v);
@@ -1803,12 +1803,12 @@ Route::get('/vitacore', function (DataForContractService $dataForContractService
             $v = '0';
             $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
             foreach ($bedProfiles as $bp) {
-                $v = bcadd($v, $bp[$indicatorId]);
+                $v = bcadd($v, $bp[$indicatorId] ?? '0');
             }
 
             $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
             foreach ($bedProfiles as $bp) {
-                $v = bcadd($v, $bp[$indicatorId]);
+                $v = bcadd($v, $bp[$indicatorId] ?? '0');
             }
             $sheet->setCellValue([$curColumn,$curRow], $v);
             $rowOffset++;
@@ -1858,7 +1858,7 @@ Route::get('/vitacore', function (DataForContractService $dataForContractService
                 if($bpId === $bedProfileId) {
                     continue;
                 }
-                $v = bcadd($v, $bp[$indicatorId]);
+                $v = bcadd($v, $bp[$indicatorId] ?? '0');
             }
             $sheet->setCellValue([$curColumn,$curRow], $v);
             $rowOffset++;
@@ -2128,6 +2128,1342 @@ Route::get('/vitacore', function (DataForContractService $dataForContractService
         }
     }
     $colOfset += 12;
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save($fullResultFilepath);
+    return Storage::download($resultFilePath);
+});
+
+
+function vitacoreV2PrintRow(
+        Worksheet $sheet,
+        int $colIndex,
+        int $rowIndex,
+        string | int $ordinalRowNum,
+        string | int $moCode,
+        string $moName,
+        string $planningSectionName,
+        string $planningParamName,
+        array $values
+    ) {
+        $moCodeColOffset = 1;
+        $moShortNameColOffset = 2;
+        $planningSectionColOffset = 3;
+        $paramColOffset = 4;
+        $firstValueColOffset = 5;
+
+        $sheet->setCellValue([$colIndex, $rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([$colIndex + $moCodeColOffset, $rowIndex], $moCode);
+        $sheet->setCellValue([$colIndex + $moShortNameColOffset, $rowIndex], $moName);
+        $sheet->setCellValue([$colIndex + $planningSectionColOffset, $rowIndex], $planningSectionName);
+        $sheet->setCellValue([$colIndex + $paramColOffset, $rowIndex], $planningParamName);
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $sheet->setCellValue([$colIndex + $firstValueColOffset + $monthNum - 1, $rowIndex], $values[$monthNum]);
+        }
+}
+
+function vitacoreV2PrintTableHeader(
+        Worksheet $sheet,
+        int $colIndex,
+        int $rowIndex,
+  ) {
+    $months = [
+        1 => 'Январь',
+        2 => 'Февраль',
+        3 => 'Март',
+        4 => 'Апрель',
+        5 => 'Май',
+        6 => 'Июнь',
+        7 => 'Июль',
+        8 => 'Август',
+        9 => 'Сентябрь',
+        10 => 'Октябрь',
+        11 => 'Ноябрь',
+        12 => 'Декабрь',
+    ];
+    vitacoreV2PrintRow($sheet, $colIndex, $rowIndex, "", "", "", "", "", $months);
+}
+
+
+Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
+    $packageIds = null;
+    if ($commissionDecisionsId) {
+        $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
+        $cd = $commissionDecisions->find($commissionDecisionsId);
+        $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
+        $protocolDate = $cd->date->format('d.m.Y');
+        $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+    } else {
+        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+    }
+
+    $path = 'xlsx';
+    $resultFileName = 'vitacore.xlsx';
+    $strDateTimeNow = date("Y-m-d-His");
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $fullResultFilepath = Storage::path($resultFilePath);
+
+    bcscale(4);
+
+    $content = $dataForContractService->GetArray($year, $packageIds);
+    $contentByMonth = [];
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $contentByMonth[$monthNum] = $dataForContractService->GetArrayByYearAndMonth($year, $monthNum, $packageIds);
+    }
+
+    $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, $packageIds);
+    $moCollection = MedicalInstitution::orderBy('order')->get();
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setCellValue([1, 1], "Год:");
+    $sheet->setCellValue([2, 1], "$year");
+
+    $ordinalRowNum = 1;
+    $firstTableHeadRowIndex = 2;
+    $firstTableDataRowIndex = 3;
+    $firstTableColIndex = 1;
+    $rowOffset = 0;
+
+    vitacoreV2PrintTableHeader($sheet, $firstTableColIndex, $firstTableHeadRowIndex);
+
+    foreach($moCollection as $mo) {
+        $planningSectionName = "Скорая помощь";
+        $planningParamName = "объемы, вызовов";
+        $category = 'ambulance';
+        $indicatorId = 5; // вызовов
+        $callsAssistanceTypeId = 5; // вызовы
+        $thrombolysisAssistanceTypeId = 6;// тромболизис
+
+        $thrombolysis = [];
+        $calls = [];
+        $hasValue = false;
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $thrombolysis[$monthNum] = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
+            $calls[$monthNum] = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? 0;
+            if( bccomp($thrombolysis[$monthNum],'0') !== 0
+                || bccomp($calls[$monthNum],'0') !== 0
+            ) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            $values = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $values[$monthNum] = $calls[$monthNum] + $thrombolysis[$monthNum];
+            }
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 2.обращения по заболеваниям
+        $planningSectionName = "Амбулаторная помощь в связи с заболеваниями";
+        $planningParamName = "объемы, обращений";
+        $hasValue = false;
+        $category = 'polyclinic';
+        $indicatorId = 8; // обращений
+        $assistanceTypeId = 4; // обращения по заболеваниям
+        $perPerson = [];
+        $perUnit = [];
+        $fap = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $perPerson[$monthNum] = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $perUnit[$monthNum] = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap[$monthNum] = 0;
+            foreach ($faps as $f) {
+                $fap[$monthNum] += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            }
+            if( bccomp($perPerson[$monthNum],'0') !== 0
+                || bccomp($perUnit[$monthNum],'0') !== 0
+                || bccomp($fap[$monthNum],'0') !== 0
+            ) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            $values = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $values[$monthNum] = $perPerson[$monthNum] + $perUnit[$monthNum] + $fap[$monthNum];
+            }
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+
+        // фин.обесп.
+        $category = 'polyclinic';
+        $assistanceTypeId = 4; //обращения по заболеваниям
+        $indicatorId = 4; // стоимость
+
+        // не заполняется по медицинским организациям имеющим прикрепленное население
+        if (!($peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? false)) {
+            $planningSectionName = "Амбулаторная помощь в связи с заболеваниями";
+            $planningParamName = "финансовое обеспечение, руб.";
+            $hasValue = false;
+            $perPerson = [];
+            $perUnit = [];
+            $fap = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $perPerson[$monthNum] = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit[$monthNum] = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap[$monthNum] = 0;
+                foreach ($faps as $f) {
+                    $fap[$monthNum] = bcadd($fap[$monthNum], $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? '0');
+                }
+                if( bccomp($perPerson[$monthNum],'0') !== 0
+                    || bccomp($perUnit[$monthNum],'0') !== 0
+                    || bccomp($fap[$monthNum],'0') !== 0
+                ) {
+                    $hasValue = true;
+                }
+            }
+            if($hasValue) {
+                $values = [];
+                for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                    $values[$monthNum] = bcadd(bcadd($perPerson[$monthNum], $perUnit[$monthNum]), $fap[$monthNum]);
+                }
+                vitacoreV2PrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset,
+                    $ordinalRowNum,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $planningParamName,
+                    $values
+                );
+                $rowOffset++;
+                $ordinalRowNum++;
+            }
+        }
+        // 3.Посещения с иными целями
+        $planningSectionName = "Амбулаторная помощь с профилактическими и иными целями";
+        $planningParamName = "объемы, посещений";
+        $hasValue = false;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [1, 2]; //	посещения профилактические, посещения разовые по заболеваниям
+        $perPerson = [];
+        $perUnit = [];
+        $fap = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $perPerson[$monthNum] = 0;
+            $perUnit[$monthNum] = 0;
+            $fap[$monthNum] = 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson[$monthNum] += $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit[$monthNum] += $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                foreach ($faps as $f) {
+                    $fap[$monthNum] += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+            }
+            if( bccomp($perPerson[$monthNum],'0') !== 0
+                || bccomp($perUnit[$monthNum],'0') !== 0
+                || bccomp($fap[$monthNum],'0') !== 0
+            ) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $values[$monthNum] = $perPerson[$monthNum] + $perUnit[$monthNum] + $fap[$monthNum];
+            }
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // фин.обесп.
+        $category = 'polyclinic';
+        $assistanceTypeIds = [1, 2]; //	посещения профилактические, посещения разовые по заболеваниям
+        $indicatorId = 4; // стоимость
+
+        // не заполняется по медицинским организациям имеющим прикрепленное население
+
+        if (!($peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? false)) {
+            $planningSectionName = "Амбулаторная помощь с профилактическими и иными целями";
+            $planningParamName = "финансовое обеспечение, руб.";
+            $hasValue = false;
+            $perPerson = [];
+            $perUnit = [];
+            $fap = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $perPerson[$monthNum] = 0;
+                $perUnit[$monthNum] = 0;
+                $fap[$monthNum] = 0;
+                $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson[$monthNum] = bcadd($perPerson[$monthNum], $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? '0');
+                    $perUnit[$monthNum]   = bcadd($perUnit[$monthNum],   $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? '0');
+                    foreach ($faps as $f) {
+                        $fap[$monthNum] = bcadd($fap[$monthNum], $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? '0');
+                    }
+                }
+                if( bccomp($perPerson[$monthNum],'0') !== 0
+                    || bccomp($perUnit[$monthNum],'0') !== 0
+                    || bccomp($fap[$monthNum],'0') !== 0
+                ) {
+                    $hasValue = true;
+                }
+            }
+            if($hasValue) {
+                $values = [];
+                for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                    $values[$monthNum] = bcadd(bcadd($perPerson[$monthNum], $perUnit[$monthNum]), $fap[$monthNum]);
+                }
+                vitacoreV2PrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset,
+                    $ordinalRowNum,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $planningParamName,
+                    $values
+                );
+                $rowOffset++;
+                $ordinalRowNum++;
+            }
+        }
+
+        // 4 Неотложная помощь
+        $planningSectionName = "Амбулаторная помощь с неотложной целью";
+        $planningParamName = "объемы, посещений";
+        $hasValue = false;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [3]; //	посещения неотложные
+        $perPerson = [];
+        $perUnit = [];
+        $fap = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $perPerson[$monthNum] = 0;
+            $perUnit[$monthNum] = 0;
+            $fap[$monthNum] = 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson[$monthNum] += $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit[$monthNum] += $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                foreach ($faps as $f) {
+                    $fap[$monthNum] += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+            }
+            if( bccomp($perPerson[$monthNum],'0') !== 0
+                || bccomp($perUnit[$monthNum],'0') !== 0
+                || bccomp($fap[$monthNum],'0') !== 0
+            ) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $values[$monthNum] = $perPerson[$monthNum] + $perUnit[$monthNum] + $fap[$monthNum];
+            }
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // фин.обесп.
+        $category = 'polyclinic';
+        $assistanceTypeIds = [3]; // посещения неотложные
+        $indicatorId = 4; // стоимость
+
+        $planningSectionName = "Амбулаторная помощь с неотложной целью";
+        $planningParamName = "финансовое обеспечение, руб.";
+        $hasValue = false;
+        $perPerson = [];
+        $perUnit = [];
+        $fap = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $perPerson[$monthNum] = 0;
+            $perUnit[$monthNum] = 0;
+            $fap[$monthNum] = 0;
+            $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson[$monthNum] = bcadd($perPerson[$monthNum], $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? '0');
+                $perUnit[$monthNum]   = bcadd($perUnit[$monthNum],   $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? '0');
+                foreach ($faps as $f) {
+                    $fap[$monthNum] = bcadd($fap[$monthNum], $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? '0');
+                }
+            }
+            if( bccomp($perPerson[$monthNum],'0') !== 0
+                || bccomp($perUnit[$monthNum],'0') !== 0
+                || bccomp($fap[$monthNum],'0') !== 0
+            ) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            $values = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $values[$monthNum] = bcadd(bcadd($perPerson[$monthNum], $perUnit[$monthNum]), $fap[$monthNum]);
+            }
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 2.2 КТ
+        $hasValue = false;
+        $planningSectionName = "компьютерная томография";
+        $planningParamName = "объемы, услуг";
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::KT;
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // 2.2 КТ
+        $hasValue = false;
+        $planningSectionName = "компьютерная томография";
+        $planningParamName = "финансовое обеспечение, руб.";
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::KT;
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+
+        // 2.3 МРТ
+        $hasValue = false;
+        $planningSectionName = "магнитно-резонансная томография";
+        $planningParamName = "объемы, услуг";
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::MRT;
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // 2.3 МРТ
+        $category = 'polyclinic';
+        $hasValue = false;
+        $planningSectionName = "магнитно-резонансная томография";
+        $planningParamName = "финансовое обеспечение, руб.";
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::MRT;
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 2.4 УЗИ ССС
+        $hasValue = false;
+        $planningSectionName = "УЗИ сердечно-сосудистой системы";
+        $planningParamName = "объемы, услуг";
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::UltrasoundCardio;
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // 2.4 УЗИ ССС
+        $hasValue = false;
+        $planningSectionName = "УЗИ сердечно-сосудистой системы";
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::UltrasoundCardio;
+        $planningParamName = "финансовое обеспечение, руб.";
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+
+        // 2.5 Эндоскопия
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::Endoscopy;
+        $hasValue = false;
+        $planningSectionName = "Эндоскопические исследования";
+        $planningParamName = "объемы, услуг";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // 2.5 Эндоскопия
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::Endoscopy;
+        $hasValue = false;
+        $planningSectionName = "Эндоскопические исследования";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 2.6 ПАИ
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::PathologicalAnatomicalBiopsyMaterial;
+        $hasValue = false;
+        $planningSectionName = "Паталого анатомическое исследование биопсийного материала с целью диагностики онкологических заболеваний";
+        $planningParamName = "объемы, услуг";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // финансовое обеспечение
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::PathologicalAnatomicalBiopsyMaterial;
+        $hasValue = false;
+        $planningSectionName = "Паталого анатомическое исследование биопсийного материала с целью диагностики онкологических заболеваний";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+
+        // 2.7 МГИ
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::MolecularGeneticDetectionOncological;
+        $hasValue = false;
+        $planningSectionName = "Малекулярно-генетические исследования с целью диагностики онкологических заболеваний";
+        $planningParamName = "объемы, услуг";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // финансовое обеспечение
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::MolecularGeneticDetectionOncological;
+        $hasValue = false;
+        $planningSectionName = "Малекулярно-генетические исследования с целью диагностики онкологических заболеваний";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // Тест.covid-19
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::CovidTesting;
+        $hasValue = false;
+        $planningSectionName = "Тестирование на выявление covid-19";
+        $planningParamName = "объемы, услуг";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum], '0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // финансовое обеспечение
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::CovidTesting;
+        $hasValue = false;
+        $planningSectionName = "Тестирование на выявление covid-19";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 3.3 УЗИ плода
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::FetalUltrasound;
+        $hasValue = false;
+        $planningSectionName = "УЗИ плода (1 триместр)";
+        $planningParamName = "объемы, услуг";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // финансовое обеспечение
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::FetalUltrasound;
+        $hasValue = false;
+        $planningSectionName = "УЗИ плода (1 триместр)";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 3.4 Компл.иссл. репрод.орг.
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::DiagnosisBackgroundPrecancerousDiseasesReproductiveWomen;
+        $hasValue = false;
+        $planningSectionName = "комплексное исследование для диагностики фоновых и предраковых заболеваний репродуктивных органов у женщин";
+        $planningParamName = "объемы, услуг";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // финансовое обеспечение
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::DiagnosisBackgroundPrecancerousDiseasesReproductiveWomen;
+        $hasValue = false;
+        $planningSectionName = "комплексное исследование для диагностики фоновых и предраковых заболеваний репродуктивных органов у женщин";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 3.5 Опред.антигена D
+        $category = 'polyclinic';
+        $indicatorId = 6; // услуг
+        $serviceId = MedicalServicesEnum::DeterminationAntigenD;
+        $hasValue = false;
+        $planningSectionName = "определение антигена D системы Резус (резус-фактор плода)";
+        $planningParamName = "объемы, услуг";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // финансовое обеспечение
+        $category = 'polyclinic';
+        $indicatorId = 4; // стоимость
+        $serviceId = MedicalServicesEnum::DeterminationAntigenD;
+        $hasValue = false;
+        $planningSectionName = "определение антигена D системы Резус (резус-фактор плода)";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = medicalServicesSum($contentByMonth[$monthNum], $mo->id, $serviceId, $indicatorId, $category);
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // Круглосуточный ст. (не включая ВМП и медицинскую реабилитацию)
+        $category = 'hospital';
+        $indicatorId = 7; // госпитализаций
+        $rehabilitationBedProfileId = 32; // реабилитационные соматические;
+        $hasValue = false;
+        $planningSectionName = "Круглосуточный стационар (не включая ВМП и медицинскую реабилитацию)";
+        $planningParamName = "объемы, госпитализаций";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
+            $values[$monthNum] = 0;
+            foreach ($bedProfiles as $bpId => $bp) {
+                if ($bpId === $rehabilitationBedProfileId) {
+                    continue;
+                }
+                $values[$monthNum] += $bp[$indicatorId] ?? 0;
+            }
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 6.ВМП
+        $category = 'hospital';
+        $indicatorId = 7; // госпитализаций
+        $hasValue = false;
+        $planningSectionName = "ВМП";
+        $planningParamName = "объемы, госпитализаций";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];
+            $values[$monthNum] = 0;
+            foreach ($careProfiles as $vmpGroups) {
+                foreach ($vmpGroups as $vmpTypes) {
+                    foreach ($vmpTypes as $vmpT) {
+                        $values[$monthNum] += ($vmpT[$indicatorId] ?? 0);
+                    }
+                }
+            }
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // Медреабилитация в КС
+        $category = 'hospital';
+        $indicatorId = 7; // госпитализаций
+        $rehabilitationBedProfileId = 32; // реабилитационные соматические;
+        $hasValue = false;
+        $planningSectionName = "Медицинская реабилитация";
+        $planningParamName = "объемы, госпитализаций";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'][$rehabilitationBedProfileId][$indicatorId] ?? 0;
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // 8. Дневные стационары
+        $category = 'hospital';
+        $indicatorId = 2; // случаев лечения
+        $hasValue = false;
+        $planningSectionName = "Дневные стационары";
+        $planningParamName = "объемы, случаев лечения";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = 0;
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bp) {
+                $values[$monthNum] += $bp[$indicatorId] ?? 0;
+            }
+
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bp) {
+                $values[$monthNum] += $bp[$indicatorId] ?? 0;
+            }
+
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+        // 3. ДС, фин.обеспечение
+        $category = 'hospital';
+        $indicatorId = 4; // стоимость
+        $hasValue = false;
+        $planningSectionName = "Дневные стационары";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = 0;
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bp) {
+                $values[$monthNum] = bcadd($values[$monthNum], $bp[$indicatorId] ?? '0');
+            }
+
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bp) {
+                $values[$monthNum] = bcadd($values[$monthNum], $bp[$indicatorId] ?? '0');
+            }
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // 4 КС, фин.обеспечение (не включая мед.реабилитацию и ВМП)
+        $category = 'hospital';
+        $indicatorId = 4; // стоимость
+        $rehabilitationBedProfileId = 32; // реабилитационные соматические;
+        $hasValue = false;
+        $planningSectionName = "Круглосуточный стационар (не включая ВМП и медицинскую реабилитацию)";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = 0;
+            $bedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
+            foreach ($bedProfiles as $bpId => $bp) {
+                if($bpId === $rehabilitationBedProfileId) {
+                    continue;
+                }
+                $values[$monthNum] = bcadd($values[$monthNum], $bp[$indicatorId] ?? '0');
+            }
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // 5 МР, фин.обеспечение
+        $category = 'hospital';
+        $rehabilitationBedProfileId = 32; // реабилитационные соматические;
+        $indicatorId = 4; // стоимость
+        $hasValue = false;
+        $planningSectionName = "Медицинская реабилитация";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'][$rehabilitationBedProfileId][$indicatorId] ?? 0;
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+        // 6 ВМП, фин.обеспечение
+        $category = 'hospital';
+        $indicatorId = 4; // стоимость
+        $hasValue = false;
+        $planningSectionName = "ВМП";
+        $planningParamName = "финансовое обеспечение, руб.";
+
+        $values = [];
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $values[$monthNum] = 0;
+            $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];
+            foreach ($careProfiles as $vmpGroups) {
+                foreach ($vmpGroups as $vmpTypes) {
+                    foreach ($vmpTypes as $vmpT) {
+                        $values[$monthNum] = bcadd($values[$monthNum], $vmpT[$indicatorId] ?? '0');
+                    }
+                }
+            }
+            if (bccomp($values[$monthNum],'0') !== 0) {
+                $hasValue = true;
+            }
+        }
+        if($hasValue) {
+            vitacoreV2PrintRow(
+                $sheet,
+                $firstTableColIndex,
+                $firstTableDataRowIndex + $rowOffset,
+                $ordinalRowNum,
+                $mo->code,
+                $mo->short_name,
+                $planningSectionName,
+                $planningParamName,
+                $values
+            );
+            $rowOffset++;
+            $ordinalRowNum++;
+        }
+
+    } // foreach MO
+
 
     $writer = new Xlsx($spreadsheet);
     $writer->save($fullResultFilepath);
@@ -2954,7 +4290,39 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
 
     $moCollection = MedicalInstitution::orderBy('order')->get();
 
-    $careProfilesFoms = CareProfilesFoms::all();
+    // только используемые профили
+    $bedProfilesUsedInHospital = [];
+    $bedProfilesUsedInPolyclinic = [];
+    $bedProfilesUsedInRegular = [];
+    $careProfilesUsed = [];
+    foreach($moCollection as $mo) {
+        $category = 'hospital';
+
+        $inHospitalBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+        $inPolyclinicBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+        $regularBedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? [];
+        $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? [];
+
+        $bedProfilesUsedInHospital = array_unique(array_merge($bedProfilesUsedInHospital, array_keys($inHospitalBedProfiles)));
+        $bedProfilesUsedInPolyclinic = array_unique(array_merge($bedProfilesUsedInPolyclinic, array_keys($inPolyclinicBedProfiles)));
+        $bedProfilesUsedInRegular = array_unique(array_merge($bedProfilesUsedInRegular, array_keys($regularBedProfiles)));
+        $careProfilesUsed = array_unique(array_merge($careProfilesUsed, array_keys($careProfiles)));
+    }
+    //$careProfilesFoms = CareProfilesFoms::all();
+    $order = 'name';
+    $careProfilesFomsUsedInHospital = CareProfilesFoms::whereHas('hospitalBedProfiles', function ($query) use ($bedProfilesUsedInHospital) {
+        return $query->whereIn('hospital_bed_profile_id', $bedProfilesUsedInHospital);
+    })->orderBy($order)->get();
+    $careProfilesFomsUsedInPolyclinic = CareProfilesFoms::whereHas('hospitalBedProfiles', function ($query) use ($bedProfilesUsedInPolyclinic) {
+        return $query->whereIn('hospital_bed_profile_id', $bedProfilesUsedInPolyclinic);
+    })->orderBy($order)->get();
+    $careProfilesFomsUsedInRegular = CareProfilesFoms::whereHas('hospitalBedProfiles', function ($query) use ($bedProfilesUsedInRegular) {
+        return $query->whereIn('hospital_bed_profile_id', $bedProfilesUsedInRegular);
+    })->orderBy($order)->get();
+    $careProfilesFomsUsedVmp = CareProfilesFoms::whereHas('careProfilesMz', function ($query) use ($careProfilesUsed) {
+        return $query->whereIn('care_profile_id', $careProfilesUsed);
+    })->orderBy($order)->get();
+
 
     $spreadsheet = new Spreadsheet();
     $startRow = 1;
@@ -2974,7 +4342,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $costIndicatorId = 4; // стоимость
 
     $profilesIndex = 0;
-    foreach ($careProfilesFoms as $cpf) {
+    foreach ($careProfilesFomsUsedInHospital as $cpf) {
         $d = (4 * $profilesIndex) + 3;
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], $cpf->code_v002);
@@ -2997,7 +4365,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->code);
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
 
-        foreach ($careProfilesFoms as $cpf) {
+        foreach ($careProfilesFomsUsedInHospital as $cpf) {
             $numberOfBeds = '0';
             $casesOfTreatment = '0';
             $patientDays = '0';
@@ -3040,7 +4408,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $costIndicatorId = 4; // стоимость
 
     $profilesIndex = 0;
-    foreach ($careProfilesFoms as $cpf) {
+    foreach ($careProfilesFomsUsedInPolyclinic as $cpf) {
         $d = (4 * $profilesIndex) + 3;
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], $cpf->code_v002);
@@ -3063,7 +4431,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->code);
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
 
-        foreach ($careProfilesFoms as $cpf) {
+        foreach ($careProfilesFomsUsedInPolyclinic as $cpf) {
             $numberOfBeds = '0';
             $casesOfTreatment = '0';
             $patientDays = '0';
@@ -3106,7 +4474,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $costIndicatorId = 4; // стоимость
 
     $profilesIndex = 0;
-    foreach ($careProfilesFoms as $cpf) {
+    foreach ($careProfilesFomsUsedInRegular as $cpf) {
         $d = (4 * $profilesIndex) + 3;
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], $cpf->code_v002);
@@ -3129,7 +4497,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->code);
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
 
-        foreach ($careProfilesFoms as $cpf) {
+        foreach ($careProfilesFomsUsedInRegular as $cpf) {
             $numberOfBeds = '0';
             $casesOfTreatment = '0';
             $patientDays = '0';
@@ -3171,7 +4539,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $costIndicatorId = 4; // стоимость
 
     $profilesIndex = 0;
-    foreach ($careProfilesFoms as $cpf) {
+    foreach ($careProfilesFomsUsedVmp as $cpf) {
         $d = (4 * $profilesIndex) + 3;
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow], $cpf->name);
         $sheet->setCellValue([$coloumnIndex + $d,     $tableHeadRow + 1], $cpf->code_v002);
@@ -3194,7 +4562,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->code);
         $sheet->setCellValue([$coloumnIndex++, $rowIndex], $mo->short_name);
 
-        foreach ($careProfilesFoms as $cpf) {
+        foreach ($careProfilesFomsUsedVmp as $cpf) {
             $numberOfBeds = '0';
             $casesOfTreatment = '0';
             $patientDays = '0';
