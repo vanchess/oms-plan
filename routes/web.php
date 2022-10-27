@@ -4285,8 +4285,8 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $fullResultFilepath = Storage::path($resultFilePath);
 
     bcscale(4);
-
-    $content = $dataForContractService->GetArray($year, $packageIds);
+    $indicatorIds = [1, 2, 3, 4, 7];
+    $content = $dataForContractService->GetArray($year, $packageIds, $indicatorIds);
 
     $moCollection = MedicalInstitution::orderBy('order')->get();
 
@@ -4647,7 +4647,8 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
 
     bcscale(4);
 
-    $content = $dataForContractService->GetArray($year, $packageIds);
+    $indicatorIds = [1, 2, 3, 4, 7];
+    $content = $dataForContractService->GetArray($year, $packageIds, $indicatorIds);
 
     $moCollection = MedicalInstitution::orderBy('order')->get();
 
