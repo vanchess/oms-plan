@@ -22,8 +22,8 @@ class DataForContractService
         return $this->CreateData($year, $packageIds, $indicatorIds)->toArray();
     }
 
-    public function GetArrayByYearAndMonth(int $year, int $monthNum, array $packageIds = null): array {
-        return $this->CreateDataByYearAndMonth($year, $monthNum, $packageIds)->toArray();
+    public function GetArrayByYearAndMonth(int $year, int $monthNum, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
+        return $this->CreateDataByYearAndMonth($year, $monthNum, $packageIds, $indicatorIds)->toArray();
     }
 
     private function CreateData(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]) {
@@ -36,9 +36,9 @@ class DataForContractService
         ]);
     }
 
-    private function CreateDataByYearAndMonth(int $year, int $monthNum, array $packageIds = null) {
+    private function CreateDataByYearAndMonth(int $year, int $monthNum, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]) {
         $periodIds = $this->periodService->getIdsByYearAndMonth($year, $monthNum);
-        $data = $this->CreateDataByPeriodIds($periodIds, $packageIds);
+        $data = $this->CreateDataByPeriodIds($periodIds, $packageIds, $indicatorIds);
 
         return collect([
             'mo' => $data

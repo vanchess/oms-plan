@@ -169,6 +169,9 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     $packageIds = $cd->changePackage()->pluck('id')->toArray();
     $indicatorIds = [1, 2, 3, 4, 5, 6, 7, 8, 9];
     $content = $dataForContractService->GetArray($year, $packageIds, $indicatorIds);
+    // количество коек на последний месяц года
+    $contentNumberOfBeds = $dataForContractService->GetArrayByYearAndMonth($year, 12, $packageIds, [1]);
+
     $moCollection = MedicalInstitution::orderBy('order')->get();
 
     $path = 'xlsx';
@@ -313,6 +316,7 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     foreach($moCollection as $mo) {
 
         $inHospitalBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
+        $inHospitalBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
 
         if (!$inHospitalBedProfiles) { continue; }
 
@@ -331,10 +335,15 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
                 $bpData = $inHospitalBedProfiles[$bp->id] ?? null;
                 if (!$bpData) { continue; }
 
-                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
                 $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                 $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                 $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+            foreach($hbp as $bp) {
+                $bpData = $inHospitalBedProfilesNumberOfBeds[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
             }
             if( bccomp($numberOfBeds,'0') === 0
                 && bccomp($casesOfTreatment, '0') === 0
@@ -367,7 +376,8 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
 
     foreach($moCollection as $mo) {
 
-        $inPolyclinicBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;;
+        $inPolyclinicBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
+        $inPolyclinicBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
 
         if (!$inPolyclinicBedProfiles) { continue; }
 
@@ -386,10 +396,15 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
                 $bpData = $inPolyclinicBedProfiles[$bp->id] ?? null;
                 if (!$bpData) { continue; }
 
-                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
                 $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                 $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                 $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+            foreach($hbp as $bp) {
+                $bpData = $inPolyclinicBedProfilesNumberOfBeds[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
             }
             if( bccomp($numberOfBeds,'0') === 0
                 && bccomp($casesOfTreatment, '0') === 0
@@ -422,9 +437,10 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
 
     foreach($moCollection as $mo) {
 
-        $inPolyclinicBedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
+        $roundClockBedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
+        $roundClockBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
 
-        if (!$inPolyclinicBedProfiles) { continue; }
+        if (!$roundClockBedProfiles) { continue; }
 
         $ordinalRowNum++;
         $rowIndex++;
@@ -438,13 +454,18 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
 
             $hbp = $cpf->hospitalBedProfiles;
             foreach($hbp as $bp) {
-                $bpData = $inPolyclinicBedProfiles[$bp->id] ?? null;
+                $bpData = $roundClockBedProfiles[$bp->id] ?? null;
                 if (!$bpData) { continue; }
 
-                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
                 $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                 $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                 $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+            foreach($hbp as $bp) {
+                $bpData = $roundClockBedProfilesNumberOfBeds[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
             }
             if( bccomp($numberOfBeds,'0') === 0
                 && bccomp($casesOfTreatment, '0') === 0
@@ -477,6 +498,7 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
 
     foreach($moCollection as $mo) {
         $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
+        $careProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
 
         if (!$careProfiles) { continue; }
 
@@ -498,10 +520,20 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
                 foreach ($vmpGroupsData as $vmpTypes) {
                     foreach ($vmpTypes as $vmpT)
                     {
-                        $numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
                         $casesOfTreatment = bcadd($casesOfTreatment, $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
                         $patientDays = bcadd($patientDays, $vmpT[$patientDaysIndicatorId] ?? '0');
                         $cost = bcadd($cost, $vmpT[$costIndicatorId] ?? '0');
+                    }
+                }
+            }
+            foreach($cpmz as $cp) {
+                $vmpGroupsData = $careProfilesNumberOfBeds[$cp->id] ?? null;
+                if (!$vmpGroupsData) { continue; }
+
+                foreach ($vmpGroupsData as $vmpTypes) {
+                    foreach ($vmpTypes as $vmpT)
+                    {
+                        $numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
                     }
                 }
             }
@@ -3501,6 +3533,7 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
     $spreadsheet = $reader->load($templateFullFilepath);
     $sheet = $spreadsheet->getSheetByName('1.Скорая помощь');
+    $sheet->setCellValue([13, 2], $docName);
     $ordinalRowNum = 0;
     $rowIndex = 6;
     $category = 'ambulance';
@@ -4097,6 +4130,7 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
     $spreadsheet = $reader->load($templateFullFilepath);
     $sheet = $spreadsheet->getSheetByName('1.Скорая помощь, фин.обесп.');
+    $sheet->setCellValue([12, 2], $docName);
     $ordinalRowNum = 0;
     $rowIndex = 6;
     $category = 'ambulance';
@@ -4285,8 +4319,10 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     $fullResultFilepath = Storage::path($resultFilePath);
 
     bcscale(4);
-    $indicatorIds = [1, 2, 3, 4, 7];
+    $indicatorIds = [2, 3, 4, 7];
     $content = $dataForContractService->GetArray($year, $packageIds, $indicatorIds);
+    // количество коек на последний месяц года
+    $contentNumberOfBeds = $dataForContractService->GetArrayByYearAndMonth($year, 12, $packageIds, [1]);
 
     $moCollection = MedicalInstitution::orderBy('order')->get();
 
@@ -4356,6 +4392,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $coloumnIndex = $startColoumn;
 
         $inHospitalBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
+        $inHospitalBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
 
         if (!$inHospitalBedProfiles) { continue; }
 
@@ -4376,10 +4413,15 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
                 $bpData = $inHospitalBedProfiles[$bp->id] ?? null;
                 if (!$bpData) { continue; }
 
-                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
                 $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                 $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                 $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+            foreach($hbp as $bp) {
+                $bpData = $inHospitalBedProfilesNumberOfBeds[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
             }
 
             $sheet->setCellValue([$coloumnIndex++, $rowIndex], $numberOfBeds);
@@ -4422,6 +4464,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $coloumnIndex = $startColoumn;
 
         $inPolyclinicBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
+        $inPolyclinicBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
 
         if (!$inPolyclinicBedProfiles) { continue; }
 
@@ -4442,10 +4485,15 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
                 $bpData = $inPolyclinicBedProfiles[$bp->id] ?? null;
                 if (!$bpData) { continue; }
 
-                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
                 $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                 $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                 $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+            foreach($hbp as $bp) {
+                $bpData = $inPolyclinicBedProfilesNumberOfBeds[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
             }
 
             $sheet->setCellValue([$coloumnIndex++, $rowIndex], $numberOfBeds);
@@ -4488,6 +4536,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $coloumnIndex = $startColoumn;
 
         $regularBedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
+        $regularBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
 
         if (!$regularBedProfiles) { continue; }
 
@@ -4508,10 +4557,15 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
                 $bpData = $regularBedProfiles[$bp->id] ?? null;
                 if (!$bpData) { continue; }
 
-                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
                 $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                 $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                 $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
+            }
+            foreach($hbp as $bp) {
+                $bpData = $regularBedProfilesNumberOfBeds[$bp->id] ?? null;
+                if (!$bpData) { continue; }
+
+                $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
             }
 
             $sheet->setCellValue([$coloumnIndex++, $rowIndex], $numberOfBeds);
@@ -4553,6 +4607,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         $coloumnIndex = $startColoumn;
 
         $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
+        $careProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
 
         if (!$careProfiles) { continue; }
 
@@ -4576,10 +4631,21 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
                 foreach ($vmpGroupsData as $vmpTypes) {
                     foreach ($vmpTypes as $vmpT)
                     {
-                        $numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
                         $casesOfTreatment = bcadd($casesOfTreatment, $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
                         $patientDays = bcadd($patientDays, $vmpT[$patientDaysIndicatorId] ?? '0');
                         $cost = bcadd($cost, $vmpT[$costIndicatorId] ?? '0');
+                    }
+                }
+            }
+
+            foreach($cpmz as $cp) {
+                $vmpGroupsData = $careProfilesNumberOfBeds[$cp->id] ?? null;
+                if (!$vmpGroupsData) { continue; }
+
+                foreach ($vmpGroupsData as $vmpTypes) {
+                    foreach ($vmpTypes as $vmpT)
+                    {
+                        $numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
                     }
                 }
             }
@@ -4647,8 +4713,10 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
 
     bcscale(4);
 
-    $indicatorIds = [1, 2, 3, 4, 7];
+    $indicatorIds = [2, 3, 4, 7];
     $content = $dataForContractService->GetArray($year, $packageIds, $indicatorIds);
+    // количество коек на последний месяц года
+    $contentNumberOfBeds = $dataForContractService->GetArrayByYearAndMonth($year, 12, $packageIds, [1]);
 
     $moCollection = MedicalInstitution::orderBy('order')->get();
 
@@ -4674,6 +4742,7 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
         ];
 
         $inHospitalBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
+        $inHospitalBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
         if ($inHospitalBedProfiles) {
             $planningSectionName = 'Дневные стационары при стационаре';
             $numberOfBedsIndicatorId = 1; // число коек
@@ -4689,9 +4758,10 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
                 $hbp = $cpf->hospitalBedProfiles;
                 foreach($hbp as $bp) {
                     $bpData = $inHospitalBedProfiles[$bp->id] ?? null;
-                    if (!$bpData) { continue; }
+                    $bpDataNumberOfBeds = $inHospitalBedProfilesNumberOfBeds[$bp->id] ?? null;
+                    if (!$bpData && !$bpDataNumberOfBeds) { continue; }
 
-                    $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
+                    $numberOfBeds = bcadd($numberOfBeds, $bpDataNumberOfBeds[$numberOfBedsIndicatorId] ?? '0');
                     $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                     $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                     $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
@@ -4761,6 +4831,7 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
         }
 
         $inPolyclinicBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
+        $inPolyclinicBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
         if ($inPolyclinicBedProfiles) {
             $planningSectionName = 'Дневные стационары при поликлинике';
             $numberOfBedsIndicatorId = 1; // число коек
@@ -4777,9 +4848,10 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
                 $hbp = $cpf->hospitalBedProfiles;
                 foreach($hbp as $bp) {
                     $bpData = $inPolyclinicBedProfiles[$bp->id] ?? null;
-                    if (!$bpData) { continue; }
+                    $bpDataNumberOfBeds = $inPolyclinicBedProfilesNumberOfBeds[$bp->id] ?? null;
+                    if (!$bpData && !$bpDataNumberOfBeds) { continue; }
 
-                    $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
+                    $numberOfBeds = bcadd($numberOfBeds, $bpDataNumberOfBeds[$numberOfBedsIndicatorId] ?? '0');
                     $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                     $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                     $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
@@ -4851,6 +4923,7 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
         $planningParamNames[3] = "объемы, койко-дней";
 
         $regularBedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
+        $regularBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
         $planningSectionName = 'Круглосуточный стационар (не включая ВМП)';
         if ($regularBedProfiles) {
             $numberOfBedsIndicatorId = 1; // число коек
@@ -4867,9 +4940,10 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
                 $hbp = $cpf->hospitalBedProfiles;
                 foreach($hbp as $bp) {
                     $bpData = $regularBedProfiles[$bp->id] ?? null;
-                    if (!$bpData) { continue; }
+                    $bpDataNumberOfBeds = $regularBedProfilesNumberOfBeds[$bp->id] ?? null;
+                    if (!$bpData && !$bpDataNumberOfBeds) { continue; }
 
-                    $numberOfBeds = bcadd($numberOfBeds, $bpData[$numberOfBedsIndicatorId] ?? '0');
+                    $numberOfBeds = bcadd($numberOfBeds, $bpDataNumberOfBeds[$numberOfBedsIndicatorId] ?? '0');
                     $casesOfTreatment = bcadd($casesOfTreatment, $bpData[$casesOfTreatmentIndicatorId] ?? '0');
                     $patientDays = bcadd($patientDays, $bpData[$patientDaysIndicatorId] ?? '0');
                     $cost = bcadd($cost, $bpData[$costIndicatorId] ?? '0');
@@ -4939,6 +5013,7 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
         }
 
         $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
+        $careProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
         if ($careProfiles) {
             $planningSectionName = 'ВМП';
             $numberOfBedsIndicatorId = 1; // число коек
@@ -4960,10 +5035,20 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
                     foreach ($vmpGroupsData as $vmpTypes) {
                         foreach ($vmpTypes as $vmpT)
                         {
-                            $numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
                             $casesOfTreatment = bcadd($casesOfTreatment, $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
                             $patientDays = bcadd($patientDays, $vmpT[$patientDaysIndicatorId] ?? '0');
                             $cost = bcadd($cost, $vmpT[$costIndicatorId] ?? '0');
+                        }
+                    }
+                }
+                foreach($cpmz as $cp) {
+                    $vmpGroupsData = $careProfilesNumberOfBeds[$cp->id] ?? null;
+                    if (!$vmpGroupsData) { continue; }
+
+                    foreach ($vmpGroupsData as $vmpTypes) {
+                        foreach ($vmpTypes as $vmpT)
+                        {
+                            $numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
                         }
                     }
                 }
