@@ -5124,6 +5124,8 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
 
 
 Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
+    $onlyMoModifiedByCommission = true;
+
     $packageIds = null;
     $protocolNumber = 0;
     $protocolDate = '';
@@ -5138,12 +5140,16 @@ Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService 
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
-    // InitialChanges::dispatch(2022);
-    // InitialDataLoaded::dispatch(2, 2022, 1);
-    // InitialDataLoaded::dispatch(9, 2022, 1);
 
-    //$year = 2022;
-    //$commit = null;
+    $moIds = null;
+    if ($commissionDecisionsId){
+        if ($onlyMoModifiedByCommission) {
+            $c = CommissionDecision::find($commissionDecisionsId);
+            $pIds = $c->changePackage()->pluck('id')->toArray();
+            $moIds = PlannedIndicatorChange::select('mo_id')->where('package_id', $pIds)->groupBy('mo_id')->get()->pluck('mo_id')->toArray();
+        }
+    }
+
     $strDateTimeNow = date("Y-m-d-His");
     $path =  $year.DIRECTORY_SEPARATOR.$protocolNumber.'('.$protocolDate.')'.DIRECTORY_SEPARATOR.$strDateTimeNow.DIRECTORY_SEPARATOR;
 
@@ -5182,7 +5188,7 @@ Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService 
     $moDepartments = $moDepartmentsInfoForContractService->GetJson();
     Storage::put($path.'moDepartments.json', $moDepartments);
 
-    $content = $dataForContractService->GetJson($year, $packageIds);
+    $content = $dataForContractService->GetJson($year, $packageIds, $moIds);
     Storage::put($path.'data.json', $content);
 
     $content = $peopleAssignedInfoForContractService->GetJson($year, $packageIds);

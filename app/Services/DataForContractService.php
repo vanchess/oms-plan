@@ -14,8 +14,8 @@ class DataForContractService
         private PeriodService $periodService
     ) {}
 
-    public function GetJson(int $year, array $packageIds = null): string {
-        return $this->CreateData($year, $packageIds)->toJson();
+    public function GetJson(int $year, array $packageIds = null, array $moIds = null): string {
+        return $this->CreateData($year, $packageIds, moIds:$moIds)->toJson();
     }
 
     public function GetArray(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
@@ -26,9 +26,9 @@ class DataForContractService
         return $this->CreateDataByYearAndMonth($year, $monthNum, $packageIds, $indicatorIds)->toArray();
     }
 
-    private function CreateData(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]) {
+    private function CreateData(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
         $periodIds = $this->periodService->getIdsByYear($year);
-        $data = $this->CreateDataByPeriodIds($periodIds, $packageIds, $indicatorIds);
+        $data = $this->CreateDataByPeriodIds($periodIds, $packageIds, $indicatorIds, $moIds);
 
         return collect([
             'year' => $year,
@@ -45,7 +45,7 @@ class DataForContractService
         ]);
     }
 
-    private function CreateDataByPeriodIds(array $periodIds, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]) {
+    private function CreateDataByPeriodIds(array $periodIds, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
 
         $hospitalNodeIds = [1,2,3,4,5,6,7];
         $hospitalDaytimeNodeIds = [2,4,5];
@@ -68,6 +68,9 @@ class DataForContractService
         ->leftJoin((new PlannedIndicatorChange())->getTable().' as pic', 'pi.id', '=', 'pic.planned_indicator_id');
         if ($packageIds) {
             $dataSql = $dataSql->whereIn('package_id',$packageIds);
+        }
+        if ($moIds) {
+            $dataSql = $dataSql->whereIn('mo_id',$moIds);
         }
         //
         $dataSql = $dataSql->whereIn('indicator_id', $indicatorIds)
