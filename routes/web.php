@@ -305,7 +305,7 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     $sheet = $spreadsheet->getSheetByName('ДС при стационаре');
     $sheet->setCellValue([1,3], $docName);
     $ordinalRowNum = 0;
-    $rowIndex = $startRow - 1;
+    $rowIndex = $startRow;
     $category = 'hospital';
 
     $numberOfBedsIndicatorId = 1; // число коек
@@ -314,14 +314,13 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     $costIndicatorId = 4; // стоимость
 
     foreach($moCollection as $mo) {
-
+        $moRowIndex = $rowIndex;
         $inHospitalBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
         $inHospitalBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
 
         if (!$inHospitalBedProfiles) { continue; }
 
         $ordinalRowNum++;
-        $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         foreach ($careProfilesFoms as $cpf) {
@@ -351,22 +350,25 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
                 && bccomp($cost, '0') === 0
             ) {continue;}
 
-            $rowIndex++;
             $sheet->setCellValue([3,$rowIndex], $cpf->name);
             $sheet->setCellValue([4,$rowIndex], $numberOfBeds);
             $sheet->setCellValue([5,$rowIndex], $casesOfTreatment);
             $sheet->setCellValue([6,$rowIndex], $patientDays);
             $sheet->setCellValue([7,$rowIndex], $cost);
+            $rowIndex++;
         }
-
+        if ($rowIndex - 1 > $moRowIndex) {
+            $sheet->mergeCells([1, $moRowIndex, 1, $rowIndex - 1]);
+            $sheet->mergeCells([2, $moRowIndex, 2, $rowIndex - 1]);
+        }
     }
-    $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+    $sheet->removeRow($rowIndex,$endRow-$rowIndex+1);
 
 
     $sheet = $spreadsheet->getSheetByName('ДС при поликлинике');
     $sheet->setCellValue([1,3], $docName);
     $ordinalRowNum = 0;
-    $rowIndex = $startRow - 1;
+    $rowIndex = $startRow;
     $category = 'hospital';
 
     $numberOfBedsIndicatorId = 1; // число коек
@@ -375,14 +377,14 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     $costIndicatorId = 4; // стоимость
 
     foreach($moCollection as $mo) {
-
+        $moRowIndex = $rowIndex;
         $inPolyclinicBedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
         $inPolyclinicBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
 
         if (!$inPolyclinicBedProfiles) { continue; }
 
         $ordinalRowNum++;
-        $rowIndex++;
+        // $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         foreach ($careProfilesFoms as $cpf) {
@@ -412,22 +414,25 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
                 && bccomp($cost, '0') === 0
             ) {continue;}
 
-            $rowIndex++;
             $sheet->setCellValue([3,$rowIndex], "$cpf->name");
             $sheet->setCellValue([4,$rowIndex], $numberOfBeds);
             $sheet->setCellValue([5,$rowIndex], $casesOfTreatment);
             $sheet->setCellValue([6,$rowIndex], $patientDays);
             $sheet->setCellValue([7,$rowIndex], $cost);
+            $rowIndex++;
         }
-
+        if ($rowIndex - 1 > $moRowIndex) {
+            $sheet->mergeCells([1, $moRowIndex, 1, $rowIndex - 1]);
+            $sheet->mergeCells([2, $moRowIndex, 2, $rowIndex - 1]);
+        }
     }
-    $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+    $sheet->removeRow($rowIndex,$endRow-$rowIndex+1);
 
 
     $sheet = $spreadsheet->getSheetByName('КС');
     $sheet->setCellValue([1,3], $docName);
     $ordinalRowNum = 0;
-    $rowIndex = $startRow - 1;
+    $rowIndex = $startRow;
     $category = 'hospital';
 
     $numberOfBedsIndicatorId = 1; // число коек
@@ -436,14 +441,13 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     $costIndicatorId = 4; // стоимость
 
     foreach($moCollection as $mo) {
-
+        $moRowIndex = $rowIndex;
         $roundClockBedProfiles = $content['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
         $roundClockBedProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
 
         if (!$roundClockBedProfiles) { continue; }
 
         $ordinalRowNum++;
-        $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         foreach ($careProfilesFoms as $cpf) {
@@ -473,22 +477,25 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
                 && bccomp($cost, '0') === 0
             ) {continue;}
 
-            $rowIndex++;
             $sheet->setCellValue([3,$rowIndex], "$cpf->name");
             $sheet->setCellValue([4,$rowIndex], $numberOfBeds);
             $sheet->setCellValue([5,$rowIndex], $casesOfTreatment);
             $sheet->setCellValue([6,$rowIndex], $patientDays);
             $sheet->setCellValue([7,$rowIndex], $cost);
+            $rowIndex++;
         }
-
+        if ($rowIndex - 1 > $moRowIndex) {
+            $sheet->mergeCells([1, $moRowIndex, 1, $rowIndex - 1]);
+            $sheet->mergeCells([2, $moRowIndex, 2, $rowIndex - 1]);
+        }
     }
-    $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+    $sheet->removeRow($rowIndex,$endRow-$rowIndex+1);
 
 
     $sheet = $spreadsheet->getSheetByName('ВМП');
     $sheet->setCellValue([1,3], $docName);
     $ordinalRowNum = 0;
-    $rowIndex = $startRow - 1;
+    $rowIndex = $startRow;
     $category = 'hospital';
 
     $numberOfBedsIndicatorId = 1; // число коек
@@ -497,13 +504,13 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     $costIndicatorId = 4; // стоимость
 
     foreach($moCollection as $mo) {
+        $moRowIndex = $rowIndex;
         $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
         $careProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
 
         if (!$careProfiles) { continue; }
 
         $ordinalRowNum++;
-        $rowIndex++;
         $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
         $sheet->setCellValue([2,$rowIndex], $mo->short_name);
         foreach ($careProfilesFoms as $cpf) {
@@ -544,16 +551,19 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
                 && bccomp($cost, '0') === 0
             ) {continue;}
 
-            $rowIndex++;
             $sheet->setCellValue([3,$rowIndex], "$cpf->name");
             $sheet->setCellValue([4,$rowIndex], $numberOfBeds);
             $sheet->setCellValue([5,$rowIndex], $casesOfTreatment);
             $sheet->setCellValue([6,$rowIndex], $patientDays);
             $sheet->setCellValue([7,$rowIndex], $cost);
+            $rowIndex++;
         }
-
+        if ($rowIndex - 1 > $moRowIndex) {
+            $sheet->mergeCells([1, $moRowIndex, 1, $rowIndex - 1]);
+            $sheet->mergeCells([2, $moRowIndex, 2, $rowIndex - 1]);
+        }
     }
-    $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+    $sheet->removeRow($rowIndex,$endRow-$rowIndex+1);
 
 
     $sheet = $spreadsheet->getSheetByName('АП (подушевое финансирование)');
