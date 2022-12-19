@@ -164,6 +164,7 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     // $year = 2022;
     // $commissionDecisionsId = 19;
     $cd = CommissionDecision::find($commissionDecisionsId);
+    $currentlyUsedDate = $cd->date->format('Y-m-d');
     $protocolDate = $cd->date->format('d.m.Y');
     $docName = "протокол заседания КРТП ОМС №$cd->number от $protocolDate";
     $packageIds = $cd->changePackage()->pluck('id')->toArray();
@@ -172,7 +173,7 @@ Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', function (DataForC
     // количество коек на последний месяц года
     $contentNumberOfBeds = $dataForContractService->GetArrayByYearAndMonth($year, 12, $packageIds, [1]);
 
-    $moCollection = MedicalInstitution::orderBy('order')->get();
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
 
     $path = 'xlsx';
     $templateFileName = 'meetingMinutes.xlsx';
@@ -2229,12 +2230,15 @@ function vitacoreV2PrintTableHeader(
 
 Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
+    $currentlyUsedDate = $year.'-01-01';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
         $protocolDate = $cd->date->format('d.m.Y');
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+
+        $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
@@ -2255,7 +2259,7 @@ Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForCont
     }
 
     $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, $packageIds);
-    $moCollection = MedicalInstitution::orderBy('order')->get();
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
 
     $spreadsheet = new Spreadsheet();
     $sheet = $spreadsheet->getActiveSheet();
@@ -3515,6 +3519,8 @@ Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForCont
 
 Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
+    $currentlyUsedDate = $year.'-01-01';
+    $docName = "";
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
@@ -3522,6 +3528,8 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
         $protocolDate = $cd->date->format('d.m.Y');
         $docName = "к протоколу заседания комиссии по разработке территориальной программы ОМС Курганской области от $protocolDate";
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+
+        $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
@@ -3538,7 +3546,7 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
 
     $content = $dataForContractService->GetArray($year, $packageIds);
     $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, $packageIds);
-    $moCollection = MedicalInstitution::orderBy('order')->get();
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
 
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
     $spreadsheet = $reader->load($templateFullFilepath);
@@ -4110,6 +4118,7 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
 
 Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
+    $currentlyUsedDate = $year.'-01-01';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
@@ -4117,6 +4126,8 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
         $protocolDate = $cd->date->format('d.m.Y');
         $docName = "к протоколу заседания комиссии по разработке территориальной программы ОМС Курганской области от $protocolDate";
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+
+        $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
@@ -4135,7 +4146,7 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
 
     $content = $dataForContractService->GetArray($year, $packageIds);
     $peopleAssigned = $peopleAssignedInfoForContractService->GetArray($year, $packageIds);
-    $moCollection = MedicalInstitution::orderBy('order')->get();
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
 
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
     $spreadsheet = $reader->load($templateFullFilepath);
@@ -4314,11 +4325,14 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
 
 Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
+    $currentlyUsedDate = $year.'-01-01';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+
+        $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
@@ -4334,7 +4348,7 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
     // количество коек на последний месяц года
     $contentNumberOfBeds = $dataForContractService->GetArrayByYearAndMonth($year, 12, $packageIds, [1]);
 
-    $moCollection = MedicalInstitution::orderBy('order')->get();
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
 
     // только используемые профили
     $bedProfilesUsedInHospital = [];
@@ -4707,11 +4721,14 @@ function vitacoreHospitalByProfilePrintRow(
 
 Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
+    $currentlyUsedDate = $year.'-01-01';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+
+        $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
@@ -4728,7 +4745,7 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
     // количество коек на последний месяц года
     $contentNumberOfBeds = $dataForContractService->GetArrayByYearAndMonth($year, 12, $packageIds, [1]);
 
-    $moCollection = MedicalInstitution::orderBy('order')->get();
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
 
     $careProfilesFoms = CareProfilesFoms::all();
 
@@ -5134,7 +5151,8 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
 
 
 Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
-    $onlyMoModifiedByCommission = true;
+    //$onlyMoModifiedByCommission = true;
+    $onlyMoModifiedByCommission = false;
 
     $packageIds = null;
     $protocolNumber = 0;

@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 
 use App\Http\Resources\MedicalInstitutionCollection;
 use App\Http\Resources\MedicalInstitutionResource;
+use DateTime;
+use Illuminate\Support\Facades\Validator;
 
 class MedicalInstitutionController extends Controller
 {
@@ -17,12 +19,26 @@ class MedicalInstitutionController extends Controller
      */
     public function index(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'date' => 'date|after:2021-12-31',
+        ]);
+        if ($validator->fails()) {
+            return response()->json($validator->errors()->toJson(), 400);
+        }
+
+        $validated = $validator->validated();
+        $date = date('Y-m-d');
+        if (isset($validated['date'])) {
+            $date = $validated['date'];
+        }
         //$perPage = (int)$request->input('per_page', 0);
         //if($perPage == -1) {
         //    $result = MedicalInstitution::OrderBy('order')->paginate(999999999);
         //    return new MedicalInstitutionCollection($result);
         //}
-        return new MedicalInstitutionCollection(MedicalInstitution::OrderBy('order')->get());//->paginate($perPage));
+        //return $date;
+        //return MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$date])->orderBy('order')->toSql();//->paginate($perPage));
+        return new MedicalInstitutionCollection(MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$date])->orderBy('order')->get());//->paginate($perPage));
     }
 
     /**
@@ -44,7 +60,7 @@ class MedicalInstitutionController extends Controller
      */
     public function show(MedicalInstitution $medicalInstitution)
     {
-        // сообщить ресурсу, что мы не хотим что бы он был завернут (элемент не должен иметь ключ верхнего уровня data) 
+        // сообщить ресурсу, что мы не хотим что бы он был завернут (элемент не должен иметь ключ верхнего уровня data)
         MedicalInstitutionResource::withoutWrapping();
         return new MedicalInstitutionResource($medicalInstitution);
     }
