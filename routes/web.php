@@ -98,6 +98,19 @@ class MedicalServicesEnum {
         public const FetalUltrasound = 12;
 }
 
+Route::get('/createPeriods/{year}', function (int $year) {
+    for ($i = 1; $i <= 12; $i++) {
+        $monthNum = str_pad($i, 2, 0, STR_PAD_LEFT);
+        $month = new DateTime("${year}-${monthNum}-01T00:00:00.000000+0500");
+        $from = new DateTime("first day of {$month->format('F')} ${year}+0500");
+        $to = new DateTime("last day of {$month->format('F')} ${year}T23:59:59.999999+0500");
+        $from->setTimezone(new DateTimeZone('UTC'));
+        $to->setTimezone(new DateTimeZone('UTC'));
+        Period::firstOrCreate(['from' => $from, 'to' => $to]);
+    }
+    return 'ok';
+});
+
 Route::get('/321123', function (InitialDataService $initialDataService) {
 
     $nodeId = 4;
