@@ -31,14 +31,8 @@ class MedicalInstitutionController extends Controller
         if (isset($validated['date'])) {
             $date = $validated['date'];
         }
-        //$perPage = (int)$request->input('per_page', 0);
-        //if($perPage == -1) {
-        //    $result = MedicalInstitution::OrderBy('order')->paginate(999999999);
-        //    return new MedicalInstitutionCollection($result);
-        //}
-        //return $date;
-        //return MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$date])->orderBy('order')->toSql();//->paginate($perPage));
-        return new MedicalInstitutionCollection(MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$date])->orderBy('order')->get());//->paginate($perPage));
+
+        return new MedicalInstitutionCollection(MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$date])->orderBy('order')->get());
     }
 
     /**

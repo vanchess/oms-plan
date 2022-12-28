@@ -6,6 +6,7 @@ use App\Models\PlannedIndicator;
 use Illuminate\Http\Request;
 
 use App\Http\Resources\PlannedIndicatorCollection;
+use Illuminate\Support\Facades\Validator;
 
 class PlannedIndicatorController extends Controller
 {
@@ -14,9 +15,22 @@ class PlannedIndicatorController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        return new PlannedIndicatorCollection(PlannedIndicator::all());
+        $validator = Validator::make($request->all(),[
+            'year' => 'required|integer|min:2020|max:2099'
+        ]);
+        if ($validator->fails()) {
+            return response()->json($validator->errors()->toJson(), 400);
+        }
+
+        $validated = $validator->validated();
+        $date = date('Y-m-d');
+        if (isset($validated['year'])) {
+            $date = ($validated['year'].'-01-02');
+        }
+
+        return new PlannedIndicatorCollection(PlannedIndicator::WhereRaw("? BETWEEN effective_from AND effective_to", [$date])->get());
     }
 
     /**
