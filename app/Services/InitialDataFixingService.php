@@ -26,12 +26,21 @@ class InitialDataFixingService
         return isset($f);
     }
 
+    /**
+     * Есть зафиксированные начальные данные для указанного года
+     */
+    public function fixedYear(int $year): bool
+    {
+        $f = InitialDataLoaded::where('year',$year)->first();
+        return isset($f);
+    }
+
     public function commit(int $nodeId, int $year, int $userId)
     {
         $nodeIds = $this->nodeService->nodeWithChildrenIds($nodeId);
         foreach ($nodeIds as $key => $id) {
             // Пропускаем зафиксированные ранее подкатегории
-            if($this->fixed($id, $year)) {
+            if ($this->fixed($id, $year)) {
                 unset($nodeIds[$key]);
             }
         }

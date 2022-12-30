@@ -9,6 +9,7 @@ use App\Models\ChangePackage;
 use App\Models\CommissionDecision;
 use App\Models\HospitalBedProfiles;
 use App\Models\Indicator;
+use App\Models\InitialData;
 use App\Models\MedicalAssistanceType;
 use Illuminate\Support\Facades\Route;
 use App\Models\MedicalInstitution;
@@ -24,9 +25,11 @@ use App\Models\VmpTypes;
 use App\Services\DataForContractService;
 //use App\Services\NodeService;
 use App\Services\Dto\InitialDataValueDto;
+use App\Services\InitialDataFixingService;
 use App\Services\MoDepartmentsInfoForContractService;
 use App\Services\MoInfoForContractService;
 use App\Services\PeopleAssignedInfoForContractService;
+use App\Services\PlannedIndicatorChangeInitService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -149,14 +152,14 @@ Route::get('/321123', function (InitialDataService $initialDataService) {
 });
 
 Route::get('/initial_changes', function () {
-    InitialChanges::dispatch(2022);
+    InitialChanges::dispatch(2023);
     return "initial_changes";
 });
 
 Route::get('/all_initial_data_loaded', function () {
-    InitialDataLoaded::dispatch(1, 2022, 1);
-    InitialDataLoaded::dispatch(9, 2022, 1);
-    InitialDataLoaded::dispatch(17, 2022, 1);
+    InitialDataLoaded::dispatch(1, 2023, 1);
+    InitialDataLoaded::dispatch(9, 2023, 1);
+    InitialDataLoaded::dispatch(17, 2023, 1);
     return "all_initial_data_loaded";
 });
 
@@ -3530,7 +3533,7 @@ Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForCont
 });
 
 
-Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     $docName = "";
@@ -3544,7 +3547,11 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
 
         $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
-        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+        if ($initialDataFixingService->fixedYear($year)) {
+            $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+        } else {
+            $plannedIndicatorChangeInitService->fromInitialData($year);
+        }
     }
     $path = 'xlsx';
     $templateFileName = '1.xlsx';
@@ -4129,7 +4136,7 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
 });
 
 
-Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     if ($commissionDecisionsId) {
@@ -4142,7 +4149,11 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
 
         $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
-        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+        if ($initialDataFixingService->fixedYear($year)) {
+            $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+        } else {
+            $plannedIndicatorChangeInitService->fromInitialData($year);
+        }
     }
 
     $path = 'xlsx';
@@ -4336,7 +4347,7 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
 });
 
 
-Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     if ($commissionDecisionsId) {
@@ -4347,7 +4358,11 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
 
         $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
-        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+        if ($initialDataFixingService->fixedYear($year)) {
+            $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+        } else {
+            $plannedIndicatorChangeInitService->fromInitialData($year);
+        }
     }
     $path = 'xlsx';
     $resultFileName = 'hospital.xlsx';

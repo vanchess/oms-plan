@@ -9,6 +9,7 @@ use App\Services\InitialDataService;
 use App\Services\Dto\InitialDataValueDto;
 use App\Http\Resources\InitialDataCollection;
 use App\Http\Resources\InitialDataResource;
+use App\Jobs\InitialChanges;
 use App\Rules\BCMathString;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -74,6 +75,8 @@ class InitialDataController extends Controller
             value: (string)$validated['value'],
             userId: $userId
         );
+
+        InitialChanges::dispatch((int)$validated['year']);
 
         return new InitialDataResource($initialDataService->setValue($dto)->value);
         //
