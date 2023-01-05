@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\InitialDataLoaded;
 use App\Services\InitialDataFixingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class InitialDataLoadedController extends Controller
@@ -31,14 +33,29 @@ class InitialDataLoadedController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Зафиксировать начальные данные по заданным разделам(nodes), на заданный год
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
     {
-        //
+        $validator = Validator::make($request->all(),[
+            'year' => 'required|integer|min:2020|max:2099',
+            'nodes' => 'required|array',
+            'nodes.*' => 'required|integer|distinct|min:1|max:40',
+        ]);
+        if ($validator->fails()) {
+            return response()->json($validator->errors()->toJson(), 400);
+        }
+        $userId = Auth::id();
+        $year = (int)$validator->validated()['year'];
+        $nodes = $validator->validated()['nodes'];
+
+        foreach ($nodes as $nodeId) {
+            InitialDataLoaded::dispatch($nodeId, $year, $userId);
+        }
+        return "OK";
     }
 
     /**

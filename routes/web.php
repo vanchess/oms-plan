@@ -4139,6 +4139,7 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
 Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
+    $docName = "";
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);

@@ -46,7 +46,7 @@ class InitialDataFixingService
         }
 
         if($this->fixed($nodeId, $year)) {
-            throw new InitialDataIsFixedException('Начальные данные для данного раздела уже зафиксированны');
+            throw new InitialDataIsFixedException('Начальные данные для раздела уже зафиксированны');
         }
 
         $changePackage = new ChangePackage();
