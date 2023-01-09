@@ -160,6 +160,7 @@ Route::get('/all_initial_data_loaded', function () {
     InitialDataLoaded::dispatch(1, 2023, 1);
     InitialDataLoaded::dispatch(9, 2023, 1);
     InitialDataLoaded::dispatch(17, 2023, 1);
+    InitialDataLoaded::dispatch(39, 2023, 1); // Прикрепление Скорая
     return "all_initial_data_loaded";
 });
 
