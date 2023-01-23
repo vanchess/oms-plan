@@ -104,9 +104,9 @@ class MedicalServicesEnum {
 Route::get('/createPeriods/{year}', function (int $year) {
     for ($i = 1; $i <= 12; $i++) {
         $monthNum = str_pad($i, 2, 0, STR_PAD_LEFT);
-        $month = new DateTime("${year}-${monthNum}-01T00:00:00.000000+0500");
-        $from = new DateTime("first day of {$month->format('F')} ${year}+0500");
-        $to = new DateTime("last day of {$month->format('F')} ${year}T23:59:59.999999+0500");
+        $month = new DateTime("{$year}-{$monthNum}-01T00:00:00.000000+0500");
+        $from = new DateTime("first day of {$month->format('F')} {$year}+0500");
+        $to = new DateTime("last day of {$month->format('F')} {$year}T23:59:59.999999+0500");
         $from->setTimezone(new DateTimeZone('UTC'));
         $to->setTimezone(new DateTimeZone('UTC'));
         Period::firstOrCreate(['from' => $from, 'to' => $to]);
@@ -2242,6 +2242,61 @@ function vitacoreV2PrintTableHeader(
         12 => 'Декабрь',
     ];
     vitacoreV2PrintRow($sheet, $colIndex, $rowIndex, "", "", "", "", "", $months);
+}
+
+function vitacoreHospitalByProfilePeriodsPrintRow(
+    Worksheet $sheet,
+    int $colIndex,
+    int $rowIndex,
+    string | int $ordinalRowNum,
+    string | int $moCode,
+    string $moName,
+    string $planningSectionName,
+    string $careProfileName,
+    string $careProfileV002,
+    string $planningParamName,
+    array $values
+) {
+    $moCodeColOffset = 1;
+    $moShortNameColOffset = 2;
+    $planningSectionColOffset = 3;
+    $careProfileNameOffset = 4;
+    $careProfileV002Offset = 5;
+    $paramColOffset = 6;
+    $firstValueColOffset = 7;
+
+    $sheet->setCellValue([$colIndex, $rowIndex], "$ordinalRowNum");
+    $sheet->setCellValue([$colIndex + $moCodeColOffset, $rowIndex], $moCode);
+    $sheet->setCellValue([$colIndex + $moShortNameColOffset, $rowIndex], $moName);
+    $sheet->setCellValue([$colIndex + $planningSectionColOffset, $rowIndex], $planningSectionName);
+    $sheet->setCellValue([$colIndex + $careProfileNameOffset, $rowIndex], $careProfileName);
+    $sheet->setCellValue([$colIndex + $careProfileV002Offset, $rowIndex], $careProfileV002);
+    $sheet->setCellValue([$colIndex + $paramColOffset, $rowIndex], $planningParamName);
+    for ($monthNum = 1; $monthNum <= 12; $monthNum++) {
+        $sheet->setCellValue([$colIndex + $firstValueColOffset + $monthNum - 1, $rowIndex], $values[$monthNum]);
+    }
+}
+
+function vitacoreHospitalByProfilePeriodsPrintTableHeader(
+    Worksheet $sheet,
+    int $colIndex,
+    int $rowIndex,
+) {
+    $months = [
+        1 => 'Январь',
+        2 => 'Февраль',
+        3 => 'Март',
+        4 => 'Апрель',
+        5 => 'Май',
+        6 => 'Июнь',
+        7 => 'Июль',
+        8 => 'Август',
+        9 => 'Сентябрь',
+        10 => 'Октябрь',
+        11 => 'Ноябрь',
+        12 => 'Декабрь',
+    ];
+    vitacoreHospitalByProfilePeriodsPrintRow($sheet, $colIndex, $rowIndex, "", "", "", "", "", "", "", $months);
 }
 
 
@@ -5179,6 +5234,1140 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
     return Storage::download($resultFilePath);
 });
 
+
+Route::get('/vitacore-hospital-by-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+    $packageIds = null;
+    $currentlyUsedDate = $year.'-01-01';
+    if ($commissionDecisionsId) {
+        $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
+        $cd = $commissionDecisions->find($commissionDecisionsId);
+        $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
+        $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+
+        $currentlyUsedDate = $cd->date->format('Y-m-d');
+    } else {
+        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+    }
+    $path = 'xlsx';
+    $resultFileName = 'hospital-periods.xlsx';
+    $strDateTimeNow = date("Y-m-d-His");
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $fullResultFilepath = Storage::path($resultFilePath);
+
+    bcscale(4);
+
+    $indicatorIds = [1, 2, 3, 4, 7];
+    $contentByMonth = [];
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $contentByMonth[$monthNum] = $dataForContractService->GetArrayByYearAndMonth($year, $monthNum, $packageIds, $indicatorIds);
+    }
+
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
+
+    $careProfilesFoms = CareProfilesFoms::all();
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $ordinalRowNum = 1;
+    $firstTableDataRowIndex = 3;
+    $firstTableColIndex = 1;
+    $rowOffset = 0;
+    $firstTableHeadRowIndex = 2;
+
+    $category = 'hospital';
+
+    vitacoreHospitalByProfilePeriodsPrintTableHeader($sheet, $firstTableColIndex, $firstTableHeadRowIndex);
+
+    foreach($moCollection as $mo) {
+        $planningParamNames = [
+            1 => "койки",
+            2 => "объемы, случаев лечения",
+            3 => "объемы, пациенто-дней",
+            4 => "финансовое обеспечение, руб.",
+            7 => "объемы, госпитализаций"
+        ];
+
+        // Дневные стационары при стационаре
+        $numberOfBeds = [];
+        $casesOfTreatment = [];
+        $patientDays = [];
+        $cost = [];
+
+        foreach ($careProfilesFoms as $cpf) {
+            $numberOfBeds[$cpf->id] = [];
+            $casesOfTreatment[$cpf->id] = [];
+            $patientDays[$cpf->id] = [];
+            $cost[$cpf->id] = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBeds[$cpf->id][$monthNum] = '0';
+                $casesOfTreatment[$cpf->id][$monthNum] = '0';
+                $patientDays[$cpf->id][$monthNum] = '0';
+                $cost[$cpf->id][$monthNum] = '0';
+            }
+        }
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $inHospitalBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
+
+            if ($inHospitalBedProfiles) {
+                $planningSectionName = 'Дневные стационары при стационаре';
+                $numberOfBedsIndicatorId = 1; // число коек
+                $casesOfTreatmentIndicatorId = 2; // случаев лечения
+                $patientDaysIndicatorId = 3; // пациенто-дней
+                $costIndicatorId = 4; // стоимость
+
+                foreach ($careProfilesFoms as $cpf) {
+                    $hbp = $cpf->hospitalBedProfiles;
+
+                    foreach($hbp as $bp) {
+                        $bpData = $inHospitalBedProfiles[$bp->id] ?? null;
+                        if (!$bpData) { continue; }
+
+                        $numberOfBeds[$cpf->id][$monthNum] = bcadd($numberOfBeds[$cpf->id][$monthNum], $bpData[$numberOfBedsIndicatorId] ?? '0');
+                        $casesOfTreatment[$cpf->id][$monthNum] = bcadd($casesOfTreatment[$cpf->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                        $patientDays[$cpf->id][$monthNum] = bcadd($patientDays[$cpf->id][$monthNum], $bpData[$patientDaysIndicatorId] ?? '0');
+                        $cost[$cpf->id][$monthNum] = bcadd($cost[$cpf->id][$monthNum], $bpData[$costIndicatorId] ?? '0');
+                    }
+                }
+            }
+        }
+
+        foreach ($careProfilesFoms as $cpf) {
+
+            $cpNumberOfBeds = $numberOfBeds[$cpf->id];
+            $cpCasesOfTreatment = $casesOfTreatment[$cpf->id];
+            $cpPatientDays = $patientDays[$cpf->id];
+            $cpCost = $cost[$cpf->id];
+
+            $numberOfBedsHasValue = false;
+            $casesOfTreatmentHasValue = false;
+            $patientDaysHasValue = false;
+            $costHasValue = false;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBedsHasValue = $numberOfBedsHasValue || bccomp($cpNumberOfBeds[$monthNum], '0') !== 0;
+                $casesOfTreatmentHasValue = $casesOfTreatmentHasValue || bccomp($cpCasesOfTreatment[$monthNum], '0') !== 0;
+                $patientDaysHasValue = $patientDaysHasValue || bccomp($cpPatientDays[$monthNum], '0') !== 0;
+                $costHasValue = $costHasValue || bccomp($cpCost[$monthNum], '0') !== 0;
+            }
+
+            if ($numberOfBedsHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$numberOfBedsIndicatorId],
+                    $cpNumberOfBeds
+                );
+            }
+            if ($casesOfTreatmentHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                    $cpCasesOfTreatment
+                );
+            }
+            if ($patientDaysHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$patientDaysIndicatorId],
+                    $cpPatientDays
+                );
+            }
+            if ($costHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$costIndicatorId],
+                    $cpCost
+                );
+            }
+        }
+
+        // Дневные стационары при поликлинике
+        $numberOfBeds = [];
+        $casesOfTreatment = [];
+        $patientDays = [];
+        $cost = [];
+
+        foreach ($careProfilesFoms as $cpf) {
+            $numberOfBeds[$cpf->id] = [];
+            $casesOfTreatment[$cpf->id] = [];
+            $patientDays[$cpf->id] = [];
+            $cost[$cpf->id] = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBeds[$cpf->id][$monthNum] = '0';
+                $casesOfTreatment[$cpf->id][$monthNum] = '0';
+                $patientDays[$cpf->id][$monthNum] = '0';
+                $cost[$cpf->id][$monthNum] = '0';
+            }
+        }
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $inPolyclinicBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
+
+            if ($inPolyclinicBedProfiles) {
+                $planningSectionName = 'Дневные стационары при поликлинике';
+                $numberOfBedsIndicatorId = 1; // число коек
+                $casesOfTreatmentIndicatorId = 2; // случаев лечения
+                $patientDaysIndicatorId = 3; // пациенто-дней
+                $costIndicatorId = 4; // стоимость
+
+                foreach ($careProfilesFoms as $cpf) {
+                    $hbp = $cpf->hospitalBedProfiles;
+
+                    foreach($hbp as $bp) {
+                        $bpData = $inPolyclinicBedProfiles[$bp->id] ?? null;
+                        if (!$bpData) { continue; }
+
+                        $numberOfBeds[$cpf->id][$monthNum] = bcadd($numberOfBeds[$cpf->id][$monthNum], $bpData[$numberOfBedsIndicatorId] ?? '0');
+                        $casesOfTreatment[$cpf->id][$monthNum] = bcadd($casesOfTreatment[$cpf->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                        $patientDays[$cpf->id][$monthNum] = bcadd($patientDays[$cpf->id][$monthNum], $bpData[$patientDaysIndicatorId] ?? '0');
+                        $cost[$cpf->id][$monthNum] = bcadd($cost[$cpf->id][$monthNum], $bpData[$costIndicatorId] ?? '0');
+                    }
+                }
+            }
+        }
+
+        foreach ($careProfilesFoms as $cpf) {
+
+            $cpNumberOfBeds = $numberOfBeds[$cpf->id];
+            $cpCasesOfTreatment = $casesOfTreatment[$cpf->id];
+            $cpPatientDays = $patientDays[$cpf->id];
+            $cpCost = $cost[$cpf->id];
+
+            $numberOfBedsHasValue = false;
+            $casesOfTreatmentHasValue = false;
+            $patientDaysHasValue = false;
+            $costHasValue = false;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBedsHasValue = $numberOfBedsHasValue || bccomp($cpNumberOfBeds[$monthNum], '0') !== 0;
+                $casesOfTreatmentHasValue = $casesOfTreatmentHasValue || bccomp($cpCasesOfTreatment[$monthNum], '0') !== 0;
+                $patientDaysHasValue = $patientDaysHasValue || bccomp($cpPatientDays[$monthNum], '0') !== 0;
+                $costHasValue = $costHasValue || bccomp($cpCost[$monthNum], '0') !== 0;
+            }
+
+            if ($numberOfBedsHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$numberOfBedsIndicatorId],
+                    $cpNumberOfBeds
+                );
+            }
+            if ($casesOfTreatmentHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                    $cpCasesOfTreatment
+                );
+            }
+            if ($patientDaysHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$patientDaysIndicatorId],
+                    $cpPatientDays
+                );
+            }
+            if ($costHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$costIndicatorId],
+                    $cpCost
+                );
+            }
+        }
+
+        // Круглосуточный стационар (не включая ВМП)
+        $planningParamNames[3] = "объемы, койко-дней";
+
+        $numberOfBeds = [];
+        $casesOfTreatment = [];
+        $patientDays = [];
+        $cost = [];
+
+        foreach ($careProfilesFoms as $cpf) {
+            $numberOfBeds[$cpf->id] = [];
+            $casesOfTreatment[$cpf->id] = [];
+            $patientDays[$cpf->id] = [];
+            $cost[$cpf->id] = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBeds[$cpf->id][$monthNum] = '0';
+                $casesOfTreatment[$cpf->id][$monthNum] = '0';
+                $patientDays[$cpf->id][$monthNum] = '0';
+                $cost[$cpf->id][$monthNum] = '0';
+            }
+        }
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $regularBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
+
+            if ($regularBedProfiles) {
+                $planningSectionName = 'Круглосуточный стационар (не включая ВМП)';
+                $numberOfBedsIndicatorId = 1; // число коек
+                $casesOfTreatmentIndicatorId = 7; // госпитализаций
+                $patientDaysIndicatorId = 3; // койко-дней
+                $costIndicatorId = 4; // стоимость
+
+                foreach ($careProfilesFoms as $cpf) {
+                    $hbp = $cpf->hospitalBedProfiles;
+
+                    foreach($hbp as $bp) {
+                        $bpData = $regularBedProfiles[$bp->id] ?? null;
+                        if (!$bpData) { continue; }
+
+                        $numberOfBeds[$cpf->id][$monthNum] = bcadd($numberOfBeds[$cpf->id][$monthNum], $bpData[$numberOfBedsIndicatorId] ?? '0');
+                        $casesOfTreatment[$cpf->id][$monthNum] = bcadd($casesOfTreatment[$cpf->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                        $patientDays[$cpf->id][$monthNum] = bcadd($patientDays[$cpf->id][$monthNum], $bpData[$patientDaysIndicatorId] ?? '0');
+                        $cost[$cpf->id][$monthNum] = bcadd($cost[$cpf->id][$monthNum], $bpData[$costIndicatorId] ?? '0');
+                    }
+                }
+            }
+        }
+
+        foreach ($careProfilesFoms as $cpf) {
+
+            $cpNumberOfBeds = $numberOfBeds[$cpf->id];
+            $cpCasesOfTreatment = $casesOfTreatment[$cpf->id];
+            $cpPatientDays = $patientDays[$cpf->id];
+            $cpCost = $cost[$cpf->id];
+
+            $numberOfBedsHasValue = false;
+            $casesOfTreatmentHasValue = false;
+            $patientDaysHasValue = false;
+            $costHasValue = false;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBedsHasValue = $numberOfBedsHasValue || bccomp($cpNumberOfBeds[$monthNum], '0') !== 0;
+                $casesOfTreatmentHasValue = $casesOfTreatmentHasValue || bccomp($cpCasesOfTreatment[$monthNum], '0') !== 0;
+                $patientDaysHasValue = $patientDaysHasValue || bccomp($cpPatientDays[$monthNum], '0') !== 0;
+                $costHasValue = $costHasValue || bccomp($cpCost[$monthNum], '0') !== 0;
+            }
+
+            if ($numberOfBedsHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$numberOfBedsIndicatorId],
+                    $cpNumberOfBeds
+                );
+            }
+            if ($casesOfTreatmentHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                    $cpCasesOfTreatment
+                );
+            }
+            if ($patientDaysHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$patientDaysIndicatorId],
+                    $cpPatientDays
+                );
+            }
+            if ($costHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$costIndicatorId],
+                    $cpCost
+                );
+            }
+        }
+
+        // ВМП
+        $planningParamNames[3] = "объемы, койко-дней";
+
+        $numberOfBeds = [];
+        $casesOfTreatment = [];
+        $patientDays = [];
+        $cost = [];
+
+        foreach ($careProfilesFoms as $cpf) {
+            $numberOfBeds[$cpf->id] = [];
+            $casesOfTreatment[$cpf->id] = [];
+            $patientDays[$cpf->id] = [];
+            $cost[$cpf->id] = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBeds[$cpf->id][$monthNum] = '0';
+                $casesOfTreatment[$cpf->id][$monthNum] = '0';
+                $patientDays[$cpf->id][$monthNum] = '0';
+                $cost[$cpf->id][$monthNum] = '0';
+            }
+        }
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
+
+            if ($careProfiles) {
+                $planningSectionName = 'ВМП';
+                $numberOfBedsIndicatorId = 1; // число коек
+                $casesOfTreatmentIndicatorId = 7; // госпитализаций
+                $patientDaysIndicatorId = 3; // койко-дней
+                $costIndicatorId = 4; // стоимость
+
+                foreach ($careProfilesFoms as $cpf) {
+                    $cpmz = $cpf->careProfilesMz;
+
+                    foreach($cpmz as $cp) {
+                        $vmpGroupsData = $careProfiles[$cp->id] ?? null;
+                        if (!$vmpGroupsData) { continue; }
+
+                        foreach ($vmpGroupsData as $vmpTypes) {
+                            foreach ($vmpTypes as $vmpT)
+                            {
+                                $numberOfBeds[$cpf->id][$monthNum] = bcadd($numberOfBeds[$cpf->id][$monthNum], $vmpT[$numberOfBedsIndicatorId] ?? '0');
+                                $casesOfTreatment[$cpf->id][$monthNum] = bcadd($casesOfTreatment[$cpf->id][$monthNum], $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
+                                $patientDays[$cpf->id][$monthNum] = bcadd($patientDays[$cpf->id][$monthNum], $vmpT[$patientDaysIndicatorId] ?? '0');
+                                $cost[$cpf->id][$monthNum] = bcadd($cost[$cpf->id][$monthNum], $vmpT[$costIndicatorId] ?? '0');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ($careProfilesFoms as $cpf) {
+            $cpNumberOfBeds = $numberOfBeds[$cpf->id];
+            $cpCasesOfTreatment = $casesOfTreatment[$cpf->id];
+            $cpPatientDays = $patientDays[$cpf->id];
+            $cpCost = $cost[$cpf->id];
+
+            $numberOfBedsHasValue = false;
+            $casesOfTreatmentHasValue = false;
+            $patientDaysHasValue = false;
+            $costHasValue = false;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBedsHasValue = $numberOfBedsHasValue || bccomp($cpNumberOfBeds[$monthNum], '0') !== 0;
+                $casesOfTreatmentHasValue = $casesOfTreatmentHasValue || bccomp($cpCasesOfTreatment[$monthNum], '0') !== 0;
+                $patientDaysHasValue = $patientDaysHasValue || bccomp($cpPatientDays[$monthNum], '0') !== 0;
+                $costHasValue = $costHasValue || bccomp($cpCost[$monthNum], '0') !== 0;
+            }
+
+            if ($numberOfBedsHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$numberOfBedsIndicatorId],
+                    $cpNumberOfBeds
+                );
+            }
+            if ($casesOfTreatmentHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                    $cpCasesOfTreatment
+                );
+            }
+            if ($patientDaysHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$patientDaysIndicatorId],
+                    $cpPatientDays
+                );
+            }
+            if ($costHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $cpf->name,
+                    $cpf->code_v002,
+                    $planningParamNames[$costIndicatorId],
+                    $cpCost
+                );
+            }
+        }
+
+    } // foreach MO
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save($fullResultFilepath);
+    return Storage::download($resultFilePath);
+});
+
+Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+    $packageIds = null;
+    $currentlyUsedDate = $year.'-01-01';
+    if ($commissionDecisionsId) {
+        $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
+        $cd = $commissionDecisions->find($commissionDecisionsId);
+        $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
+        $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+
+        $currentlyUsedDate = $cd->date->format('Y-m-d');
+    } else {
+        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+    }
+    $path = 'xlsx';
+    $resultFileName = 'hospital-periods.xlsx';
+    $strDateTimeNow = date("Y-m-d-His");
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $fullResultFilepath = Storage::path($resultFilePath);
+
+    bcscale(4);
+
+    $indicatorIds = [1, 2, 3, 4, 7];
+    $contentByMonth = [];
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $contentByMonth[$monthNum] = $dataForContractService->GetArrayByYearAndMonth($year, $monthNum, $packageIds, $indicatorIds);
+    }
+
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
+
+    $hospitalBedProfiles = HospitalBedProfiles::all();
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $ordinalRowNum = 1;
+    $firstTableDataRowIndex = 3;
+    $firstTableColIndex = 1;
+    $rowOffset = 0;
+    $firstTableHeadRowIndex = 2;
+
+    $category = 'hospital';
+
+    vitacoreHospitalByProfilePeriodsPrintTableHeader($sheet, $firstTableColIndex, $firstTableHeadRowIndex);
+
+    foreach($moCollection as $mo) {
+        $planningParamNames = [
+            1 => "койки",
+            2 => "объемы, случаев лечения",
+            3 => "объемы, пациенто-дней",
+            4 => "финансовое обеспечение, руб.",
+            7 => "объемы, госпитализаций"
+        ];
+
+        // Дневные стационары при стационаре
+        $numberOfBeds = [];
+        $casesOfTreatment = [];
+        $patientDays = [];
+        $cost = [];
+
+        foreach ($hospitalBedProfiles as $hbp) {
+            $numberOfBeds[$hbp->id] = [];
+            $casesOfTreatment[$hbp->id] = [];
+            $patientDays[$hbp->id] = [];
+            $cost[$hbp->id] = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBeds[$hbp->id][$monthNum] = '0';
+                $casesOfTreatment[$hbp->id][$monthNum] = '0';
+                $patientDays[$hbp->id][$monthNum] = '0';
+                $cost[$hbp->id][$monthNum] = '0';
+            }
+        }
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $inHospitalBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? null;
+
+            if ($inHospitalBedProfiles) {
+                $planningSectionName = 'Дневные стационары при стационаре';
+                $numberOfBedsIndicatorId = 1; // число коек
+                $casesOfTreatmentIndicatorId = 2; // случаев лечения
+                $patientDaysIndicatorId = 3; // пациенто-дней
+                $costIndicatorId = 4; // стоимость
+
+                foreach ($hospitalBedProfiles as $hbp) {
+                    $bpData = $inHospitalBedProfiles[$hbp->id] ?? null;
+                    if (!$bpData) { continue; }
+
+                    $numberOfBeds[$hbp->id][$monthNum] = bcadd($numberOfBeds[$hbp->id][$monthNum], $bpData[$numberOfBedsIndicatorId] ?? '0');
+                    $casesOfTreatment[$hbp->id][$monthNum] = bcadd($casesOfTreatment[$hbp->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                    $patientDays[$hbp->id][$monthNum] = bcadd($patientDays[$hbp->id][$monthNum], $bpData[$patientDaysIndicatorId] ?? '0');
+                    $cost[$hbp->id][$monthNum] = bcadd($cost[$hbp->id][$monthNum], $bpData[$costIndicatorId] ?? '0');
+                }
+            }
+        }
+
+        foreach ($hospitalBedProfiles as $hbp) {
+
+            $cpNumberOfBeds = $numberOfBeds[$hbp->id];
+            $cpCasesOfTreatment = $casesOfTreatment[$hbp->id];
+            $cpPatientDays = $patientDays[$hbp->id];
+            $cpCost = $cost[$hbp->id];
+
+            $numberOfBedsHasValue = false;
+            $casesOfTreatmentHasValue = false;
+            $patientDaysHasValue = false;
+            $costHasValue = false;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBedsHasValue = $numberOfBedsHasValue || bccomp($cpNumberOfBeds[$monthNum], '0') !== 0;
+                $casesOfTreatmentHasValue = $casesOfTreatmentHasValue || bccomp($cpCasesOfTreatment[$monthNum], '0') !== 0;
+                $patientDaysHasValue = $patientDaysHasValue || bccomp($cpPatientDays[$monthNum], '0') !== 0;
+                $costHasValue = $costHasValue || bccomp($cpCost[$monthNum], '0') !== 0;
+            }
+
+            if ($numberOfBedsHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$numberOfBedsIndicatorId],
+                    $cpNumberOfBeds
+                );
+            }
+            if ($casesOfTreatmentHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                    $cpCasesOfTreatment
+                );
+            }
+            if ($patientDaysHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$patientDaysIndicatorId],
+                    $cpPatientDays
+                );
+            }
+            if ($costHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$costIndicatorId],
+                    $cpCost
+                );
+            }
+        }
+
+        // Дневные стационары при поликлинике
+        $numberOfBeds = [];
+        $casesOfTreatment = [];
+        $patientDays = [];
+        $cost = [];
+
+        foreach ($hospitalBedProfiles as $hbp) {
+            $numberOfBeds[$hbp->id] = [];
+            $casesOfTreatment[$hbp->id] = [];
+            $patientDays[$hbp->id] = [];
+            $cost[$hbp->id] = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBeds[$hbp->id][$monthNum] = '0';
+                $casesOfTreatment[$hbp->id][$monthNum] = '0';
+                $patientDays[$hbp->id][$monthNum] = '0';
+                $cost[$hbp->id][$monthNum] = '0';
+            }
+        }
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $inPolyclinicBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? null;
+
+            if ($inPolyclinicBedProfiles) {
+                $planningSectionName = 'Дневные стационары при поликлинике';
+                $numberOfBedsIndicatorId = 1; // число коек
+                $casesOfTreatmentIndicatorId = 2; // случаев лечения
+                $patientDaysIndicatorId = 3; // пациенто-дней
+                $costIndicatorId = 4; // стоимость
+
+                foreach ($hospitalBedProfiles as $hbp) {
+                        $bpData = $inPolyclinicBedProfiles[$hbp->id] ?? null;
+                        if (!$bpData) { continue; }
+
+                        $numberOfBeds[$hbp->id][$monthNum] = bcadd($numberOfBeds[$hbp->id][$monthNum], $bpData[$numberOfBedsIndicatorId] ?? '0');
+                        $casesOfTreatment[$hbp->id][$monthNum] = bcadd($casesOfTreatment[$hbp->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                        $patientDays[$hbp->id][$monthNum] = bcadd($patientDays[$hbp->id][$monthNum], $bpData[$patientDaysIndicatorId] ?? '0');
+                        $cost[$hbp->id][$monthNum] = bcadd($cost[$hbp->id][$monthNum], $bpData[$costIndicatorId] ?? '0');
+                }
+            }
+        }
+
+        foreach ($hospitalBedProfiles as $hbp) {
+
+            $cpNumberOfBeds = $numberOfBeds[$hbp->id];
+            $cpCasesOfTreatment = $casesOfTreatment[$hbp->id];
+            $cpPatientDays = $patientDays[$hbp->id];
+            $cpCost = $cost[$hbp->id];
+
+            $numberOfBedsHasValue = false;
+            $casesOfTreatmentHasValue = false;
+            $patientDaysHasValue = false;
+            $costHasValue = false;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBedsHasValue = $numberOfBedsHasValue || bccomp($cpNumberOfBeds[$monthNum], '0') !== 0;
+                $casesOfTreatmentHasValue = $casesOfTreatmentHasValue || bccomp($cpCasesOfTreatment[$monthNum], '0') !== 0;
+                $patientDaysHasValue = $patientDaysHasValue || bccomp($cpPatientDays[$monthNum], '0') !== 0;
+                $costHasValue = $costHasValue || bccomp($cpCost[$monthNum], '0') !== 0;
+            }
+
+            if ($numberOfBedsHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$numberOfBedsIndicatorId],
+                    $cpNumberOfBeds
+                );
+            }
+            if ($casesOfTreatmentHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                    $cpCasesOfTreatment
+                );
+            }
+            if ($patientDaysHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$patientDaysIndicatorId],
+                    $cpPatientDays
+                );
+            }
+            if ($costHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$costIndicatorId],
+                    $cpCost
+                );
+            }
+        }
+
+        // Круглосуточный стационар (не включая ВМП)
+        $planningParamNames[3] = "объемы, койко-дней";
+
+        $numberOfBeds = [];
+        $casesOfTreatment = [];
+        $patientDays = [];
+        $cost = [];
+
+        foreach ($hospitalBedProfiles as $hbp) {
+            $numberOfBeds[$hbp->id] = [];
+            $casesOfTreatment[$hbp->id] = [];
+            $patientDays[$hbp->id] = [];
+            $cost[$hbp->id] = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBeds[$hbp->id][$monthNum] = '0';
+                $casesOfTreatment[$hbp->id][$monthNum] = '0';
+                $patientDays[$hbp->id][$monthNum] = '0';
+                $cost[$hbp->id][$monthNum] = '0';
+            }
+        }
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $regularBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['regular']['bedProfiles'] ?? null;
+
+            if ($regularBedProfiles) {
+                $planningSectionName = 'Круглосуточный стационар (не включая ВМП)';
+                $numberOfBedsIndicatorId = 1; // число коек
+                $casesOfTreatmentIndicatorId = 7; // госпитализаций
+                $patientDaysIndicatorId = 3; // койко-дней
+                $costIndicatorId = 4; // стоимость
+
+                foreach ($hospitalBedProfiles as $hbp) {
+                        $bpData = $regularBedProfiles[$hbp->id] ?? null;
+                        if (!$bpData) { continue; }
+
+                        $numberOfBeds[$hbp->id][$monthNum] = bcadd($numberOfBeds[$hbp->id][$monthNum], $bpData[$numberOfBedsIndicatorId] ?? '0');
+                        $casesOfTreatment[$hbp->id][$monthNum] = bcadd($casesOfTreatment[$hbp->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                        $patientDays[$hbp->id][$monthNum] = bcadd($patientDays[$hbp->id][$monthNum], $bpData[$patientDaysIndicatorId] ?? '0');
+                        $cost[$hbp->id][$monthNum] = bcadd($cost[$hbp->id][$monthNum], $bpData[$costIndicatorId] ?? '0');
+                }
+            }
+        }
+
+        foreach ($hospitalBedProfiles as $hbp) {
+
+            $cpNumberOfBeds = $numberOfBeds[$hbp->id];
+            $cpCasesOfTreatment = $casesOfTreatment[$hbp->id];
+            $cpPatientDays = $patientDays[$hbp->id];
+            $cpCost = $cost[$hbp->id];
+
+            $numberOfBedsHasValue = false;
+            $casesOfTreatmentHasValue = false;
+            $patientDaysHasValue = false;
+            $costHasValue = false;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBedsHasValue = $numberOfBedsHasValue || bccomp($cpNumberOfBeds[$monthNum], '0') !== 0;
+                $casesOfTreatmentHasValue = $casesOfTreatmentHasValue || bccomp($cpCasesOfTreatment[$monthNum], '0') !== 0;
+                $patientDaysHasValue = $patientDaysHasValue || bccomp($cpPatientDays[$monthNum], '0') !== 0;
+                $costHasValue = $costHasValue || bccomp($cpCost[$monthNum], '0') !== 0;
+            }
+
+            if ($numberOfBedsHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$numberOfBedsIndicatorId],
+                    $cpNumberOfBeds
+                );
+            }
+            if ($casesOfTreatmentHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                    $cpCasesOfTreatment
+                );
+            }
+            if ($patientDaysHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$patientDaysIndicatorId],
+                    $cpPatientDays
+                );
+            }
+            if ($costHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$costIndicatorId],
+                    $cpCost
+                );
+            }
+        }
+
+        // ВМП
+        $planningParamNames[3] = "объемы, койко-дней";
+
+        $numberOfBeds = [];
+        $casesOfTreatment = [];
+        $patientDays = [];
+        $cost = [];
+
+        foreach ($hospitalBedProfiles as $hbp) {
+            $numberOfBeds[$hbp->id] = [];
+            $casesOfTreatment[$hbp->id] = [];
+            $patientDays[$hbp->id] = [];
+            $cost[$hbp->id] = [];
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBeds[$hbp->id][$monthNum] = '0';
+                $casesOfTreatment[$hbp->id][$monthNum] = '0';
+                $patientDays[$hbp->id][$monthNum] = '0';
+                $cost[$hbp->id][$monthNum] = '0';
+            }
+        }
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
+
+            if ($careProfiles) {
+                $planningSectionName = 'ВМП';
+                $numberOfBedsIndicatorId = 1; // число коек
+                $casesOfTreatmentIndicatorId = 7; // госпитализаций
+                $patientDaysIndicatorId = 3; // койко-дней
+                $costIndicatorId = 4; // стоимость
+
+                foreach ($hospitalBedProfiles as $hbp) {
+                    // пропускаем профили:
+                    //  19 - Кардиохирургические
+                    //  29 - Для беременных и рожениц
+                    //  30 - Патологии беременности
+                    if ($hbp->id == 19 || $hbp->id == 29|| $hbp->id == 30) {
+                        continue;
+                    }
+                    // профиль койки относится к 1 профилю МП (на сегодняшний день так)
+                    $cpfoms = $hbp->careProfilesFoms[0];
+                    $cpmz = $cpfoms->careProfilesMz;
+
+                    foreach($cpmz as $cp) {
+                        $vmpGroupsData = $careProfiles[$cp->id] ?? null;
+                        if (!$vmpGroupsData) { continue; }
+
+                        foreach ($vmpGroupsData as $vmpTypes) {
+                            foreach ($vmpTypes as $vmpT)
+                            {
+                                $numberOfBeds[$hbp->id][$monthNum] = bcadd($numberOfBeds[$hbp->id][$monthNum], $vmpT[$numberOfBedsIndicatorId] ?? '0');
+                                $casesOfTreatment[$hbp->id][$monthNum] = bcadd($casesOfTreatment[$hbp->id][$monthNum], $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
+                                $patientDays[$hbp->id][$monthNum] = bcadd($patientDays[$hbp->id][$monthNum], $vmpT[$patientDaysIndicatorId] ?? '0');
+                                $cost[$hbp->id][$monthNum] = bcadd($cost[$hbp->id][$monthNum], $vmpT[$costIndicatorId] ?? '0');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ($hospitalBedProfiles as $hbp) {
+            $cpNumberOfBeds = $numberOfBeds[$hbp->id];
+            $cpCasesOfTreatment = $casesOfTreatment[$hbp->id];
+            $cpPatientDays = $patientDays[$hbp->id];
+            $cpCost = $cost[$hbp->id];
+
+            $numberOfBedsHasValue = false;
+            $casesOfTreatmentHasValue = false;
+            $patientDaysHasValue = false;
+            $costHasValue = false;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $numberOfBedsHasValue = $numberOfBedsHasValue || bccomp($cpNumberOfBeds[$monthNum], '0') !== 0;
+                $casesOfTreatmentHasValue = $casesOfTreatmentHasValue || bccomp($cpCasesOfTreatment[$monthNum], '0') !== 0;
+                $patientDaysHasValue = $patientDaysHasValue || bccomp($cpPatientDays[$monthNum], '0') !== 0;
+                $costHasValue = $costHasValue || bccomp($cpCost[$monthNum], '0') !== 0;
+            }
+
+            if ($numberOfBedsHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$numberOfBedsIndicatorId],
+                    $cpNumberOfBeds
+                );
+            }
+            if ($casesOfTreatmentHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                    $cpCasesOfTreatment
+                );
+            }
+            if ($patientDaysHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$patientDaysIndicatorId],
+                    $cpPatientDays
+                );
+            }
+            if ($costHasValue) {
+                vitacoreHospitalByProfilePeriodsPrintRow(
+                    $sheet,
+                    $firstTableColIndex,
+                    $firstTableDataRowIndex + $rowOffset++,
+                    $ordinalRowNum++,
+                    $mo->code,
+                    $mo->short_name,
+                    $planningSectionName,
+                    $hbp->name,
+                    $hbp->code,
+                    $planningParamNames[$costIndicatorId],
+                    $cpCost
+                );
+            }
+        }
+    } // foreach MO
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save($fullResultFilepath);
+    return Storage::download($resultFilePath);
+});
 
 Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     //$onlyMoModifiedByCommission = true;
