@@ -33,9 +33,10 @@ use App\Services\PlannedIndicatorChangeInitService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-
+use PhpOffice\PhpSpreadsheet\Shared\StringHelper;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Writer\Csv;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /*
@@ -6365,6 +6366,320 @@ Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecision
     } // foreach MO
 
     $writer = new Xlsx($spreadsheet);
+    $writer->save($fullResultFilepath);
+    return Storage::download($resultFilePath);
+});
+
+function miacHospitalByProfilePeriodsPrintRow(
+    Worksheet $sheet,
+    int $colIndex,
+    int $rowIndex,
+    string | int $moCode,
+    string | int $paymentType,
+    string | int $hospitalType,
+    string | int $bedProfileV020,
+    string | int $nMonth,
+    string | int $level,
+    string | int $value
+) {
+    $moCodeColOffset = 0;
+    $paymentTypeColOffset = 1;
+    $hospitalTypeColOffset = 2;
+    $bedProfileV020ColOffset = 3;
+    $nMonthColOffset = 4;
+    $levelColOffset = 5;
+    $valueColOffset = 6;
+
+    $sheet->setCellValue([$colIndex + $moCodeColOffset, $rowIndex], $moCode);
+    $sheet->setCellValue([$colIndex + $paymentTypeColOffset, $rowIndex], $paymentType);
+    $sheet->setCellValue([$colIndex + $hospitalTypeColOffset, $rowIndex], $hospitalType);
+    $sheet->setCellValue([$colIndex + $bedProfileV020ColOffset, $rowIndex], $bedProfileV020);
+    $sheet->setCellValue([$colIndex + $nMonthColOffset, $rowIndex], $nMonth);
+    $sheet->setCellValue([$colIndex + $levelColOffset, $rowIndex], $level);
+    $sheet->setCellValue([$colIndex + $valueColOffset, $rowIndex], $value);
+}
+
+function miacHospitalByProfilePeriodsPrintTableHeader(
+    Worksheet $sheet,
+    int $colIndex,
+    int $rowIndex,
+) {
+    miacHospitalByProfilePeriodsPrintRow($sheet, $colIndex, $rowIndex, "MCOD", "OPLAT", "TS", "PROFILE", "N_MONTH", "LEVEL", "PLAN_CASES");
+}
+
+function getOplat(string $daytimeOrRoundClock, string $hospitalSubType, int $bedProfileId): int
+{
+    $rehabilitationBedProfileId = 32; // реабилитационные соматические;
+    $isVmp = ($hospitalSubType == 'vmp');
+    if ($isVmp) {
+        return 6; // ВМП
+    }
+    if ($bedProfileId === $rehabilitationBedProfileId) {
+        return 7; // реабилитация
+    }
+    return 1; // специализированная
+}
+function getTs(string $daytimeOrRoundClock, string $hospitalSubType): int
+{
+    // 3 - стационар на дому (у нас нет)
+    if ($daytimeOrRoundClock === 'roundClock') {
+        return 1; // Круглосуточный стационар
+    }
+    if ($daytimeOrRoundClock === 'daytime') {
+        if ($hospitalSubType === 'inPolyclinic') {
+            return 2; // дневной при поликлинике
+        } elseif ($hospitalSubType = 'inHospital') {
+            return 4; // дневной при стационаре
+        }
+    }
+    return -1;
+}
+
+function getLevel(int $ts, int $moId, int $bedProfileId) : string
+{
+    $l1 = '1';
+    $l2_1 = '2,1';
+    $l2_2 = '2,2';
+    $l3_1 = '3,1';
+    $l3_2 = '3,2';
+
+    if ($ts === 2 || $ts === 4) {
+        return $l1;
+    } elseif ($ts === 1) {
+        switch ($moId) {
+            case 17	/* ГБУ "Далматовская ЦРБ" */:
+            case 20	/* ГБУ "Катайская ЦРБ" */:
+            case 25	/* ГБУ "Шадринская ЦРБ" */:
+            case 45	/* ООО "ЛДК "Центр ДНК" */:
+                return $l1;
+
+            case 89	/* ГБУ «Межрайонная больница №1» */:
+            case 90	/* ГБУ «Межрайонная больница №2» */:
+            case 91	/* ГБУ «Межрайонная больница №3» */:
+            case 92	/* ГБУ «Межрайонная больница №4» */:
+            case 93	/* ГБУ «Межрайонная больница №5» */:
+            case 94	/* ГБУ «Межрайонная больница №6» */:
+            case 95	/* ГБУ «Межрайонная больница №7» */:
+            case 96	/* ГБУ «Межрайонная больница №8» */:
+                return $l2_1;
+
+            case 7	/* ГБУ "Курганская областная специализированная инфекционная больница" */:
+            case 38	/* ЧУЗ "РЖД-Медицина" г. Курган" */:
+            case 51	/* ГБУ "Санаторий "Озеро Горькое" */:
+            case 13	/* ГБУ «КОКВД» */:
+                return $l2_2;
+
+            case 97	/* ГБУ «Курганская областная больница №2» */ :
+            case 11	/* ГБУ "Курганский областной кардиологический диспансер" */:
+            case 1	/* ГБУ "КОКБ" */:
+            case 98	/* ГБУ "ШГБ" */:
+            case 3	/* ГБУ "Курганская БСМП" */:
+            case 40	/* ГБУ "Перинатальный центр" */:
+            case 42	/* ФГБУ «НМИЦ ТО имени академика Г.А.Илизарова» Минздрава России */:
+            case 12	/* ГБУ «КОДКБ им. Красного Креста» */:
+                return $l3_1;
+
+            case 2	/* ГБУ "КООД" */:
+            case 67	/* ГБУ "КОГВВ" */:
+                return $l3_2;
+        }
+    }
+    return "ERROR";
+}
+
+Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+    $packageIds = null;
+    $currentlyUsedDate = $year.'-01-01';
+    if ($commissionDecisionsId) {
+        $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
+        $cd = $commissionDecisions->find($commissionDecisionsId);
+        $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
+        $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
+
+        $currentlyUsedDate = $cd->date->format('Y-m-d');
+    } else {
+        $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
+    }
+    $path = 'xlsx';
+    $resultFileName = 'hospital-periods.csv';
+    $strDateTimeNow = date("Y-m-d-His");
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $fullResultFilepath = Storage::path($resultFilePath);
+
+    bcscale(4);
+
+    $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
+    $hospitalBedProfiles = HospitalBedProfiles::all();
+    $oplatOption = [1,6,7];
+    $tsOption = [1,2,3,4];
+
+    $values = [];
+    foreach ($moCollection as $mo) {
+        $values[$mo->id] = [];
+        foreach ($oplatOption as $oplat) {
+            $values[$mo->id][$oplat] = [];
+            foreach ($tsOption as $ts) {
+                $values[$mo->id][$oplat][$ts] = [];
+                foreach ($hospitalBedProfiles as $hbp) {
+                    $values[$mo->id][$oplat][$ts][$hbp->id] = [];
+                    for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                        $values[$mo->id][$oplat][$ts][$hbp->id][$monthNum] = '0';
+                    }
+                }
+            }
+        }
+    }
+
+    $indicatorIds = [2, 7];
+    $contentByMonth = [];
+    for($monthNum = 1; $monthNum <= 12; $monthNum++)
+    {
+        $contentByMonth[$monthNum] = $dataForContractService->GetArrayByYearAndMonth($year, $monthNum, $packageIds, $indicatorIds);
+    }
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $ordinalRowNum = 1;
+    $firstTableDataRowIndex = 2;
+    $firstTableColIndex = 1;
+    $rowOffset = 0;
+    $firstTableHeadRowIndex = 1;
+
+    $category = 'hospital';
+
+    miacHospitalByProfilePeriodsPrintTableHeader($sheet, $firstTableColIndex, $firstTableHeadRowIndex);
+
+    foreach($moCollection as $mo) {
+        $planningParamNames = [
+            2 => "объемы, случаев лечения",
+            7 => "объемы, госпитализаций"
+        ];
+
+        // Дневные стационары при стационаре
+        $daytimeOrRoundClock = 'daytime';
+        $hospitalSubType = 'inHospital';
+        $casesOfTreatmentIndicatorId = 2; // случаев лечения
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $inHospitalBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$daytimeOrRoundClock][$hospitalSubType]['bedProfiles'] ?? null;
+
+            if ($inHospitalBedProfiles) {
+                foreach ($hospitalBedProfiles as $hbp) {
+                    $bpData = $inHospitalBedProfiles[$hbp->id] ?? null;
+                    if (!$bpData) { continue; }
+
+                    $oplat = getOplat($daytimeOrRoundClock, $hospitalSubType, $hbp->id);
+                    $ts = getTs($daytimeOrRoundClock, $hospitalSubType);
+
+                    $values[$mo->id][$oplat][$ts][$hbp->id][$monthNum] = bcadd($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                }
+            }
+        }
+
+        // Дневные стационары при поликлинике
+        $daytimeOrRoundClock = 'daytime';
+        $hospitalSubType = 'inPolyclinic';
+        $casesOfTreatmentIndicatorId = 2; // случаев лечения
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $inPolyclinicBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$daytimeOrRoundClock][$hospitalSubType]['bedProfiles'] ?? null;
+
+            if ($inPolyclinicBedProfiles) {
+                foreach ($hospitalBedProfiles as $hbp) {
+                    $bpData = $inPolyclinicBedProfiles[$hbp->id] ?? null;
+                    if (!$bpData) { continue; }
+
+                    $oplat = getOplat($daytimeOrRoundClock, $hospitalSubType, $hbp->id);
+                    $ts = getTs($daytimeOrRoundClock, $hospitalSubType);
+
+                    $values[$mo->id][$oplat][$ts][$hbp->id][$monthNum] = bcadd($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                }
+            }
+        }
+
+        // Круглосуточный стационар (не включая ВМП)
+        $daytimeOrRoundClock = 'roundClock';
+        $hospitalSubType = 'regular';
+        $casesOfTreatmentIndicatorId = 7; // госпитализаций
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $regularBedProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$daytimeOrRoundClock][$hospitalSubType]['bedProfiles'] ?? null;
+
+            if ($regularBedProfiles) {
+                foreach ($hospitalBedProfiles as $hbp) {
+                    $bpData = $regularBedProfiles[$hbp->id] ?? null;
+                    if (!$bpData) { continue; }
+
+                    $oplat = getOplat($daytimeOrRoundClock, $hospitalSubType, $hbp->id);
+                    $ts = getTs($daytimeOrRoundClock, $hospitalSubType);
+
+                    $values[$mo->id][$oplat][$ts][$hbp->id][$monthNum] = bcadd($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], $bpData[$casesOfTreatmentIndicatorId] ?? '0');
+                }
+            }
+        }
+
+        // ВМП
+        $daytimeOrRoundClock = 'roundClock';
+        $hospitalSubType = 'vmp';
+        $casesOfTreatmentIndicatorId = 7; // госпитализаций
+
+        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+            $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$daytimeOrRoundClock][$hospitalSubType]['careProfiles'] ?? null;
+
+            if ($careProfiles) {
+                foreach ($hospitalBedProfiles as $hbp) {
+                    // пропускаем профили:
+                    //  19 - Кардиохирургические
+                    //  29 - Для беременных и рожениц
+                    //  30 - Патологии беременности
+                    if ($hbp->id == 19 || $hbp->id == 29|| $hbp->id == 30) {
+                        continue;
+                    }
+                    // профиль койки относится к 1 профилю МП (на сегодняшний день так)
+                    $cpfoms = $hbp->careProfilesFoms[0];
+                    $cpmz = $cpfoms->careProfilesMz;
+
+                    $oplat = getOplat($daytimeOrRoundClock, $hospitalSubType, $hbp->id);
+                    $ts = getTs($daytimeOrRoundClock, $hospitalSubType);
+
+                    foreach($cpmz as $cp) {
+                        $vmpGroupsData = $careProfiles[$cp->id] ?? null;
+                        if (!$vmpGroupsData) { continue; }
+
+                        foreach ($vmpGroupsData as $vmpTypes) {
+                            foreach ($vmpTypes as $vmpT)
+                            {
+                                $values[$mo->id][$oplat][$ts][$hbp->id][$monthNum] = bcadd($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } // foreach MO
+
+    $row = $firstTableDataRowIndex;
+    foreach ($moCollection as $mo) {
+        foreach ($oplatOption as $oplat) {
+            foreach ($tsOption as $ts) {
+                foreach ($hospitalBedProfiles as $hbp) {
+                    for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                        if (bccomp($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], '0')) {
+                            miacHospitalByProfilePeriodsPrintRow(
+                                $sheet, $firstTableColIndex, $row++, $mo->code,
+                                $oplat, $ts, $hbp->code, $monthNum, getLevel($ts, $mo->id, $hbp->id),
+                                $values[$mo->id][$oplat][$ts][$hbp->id][$monthNum]
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $writer = new Csv($spreadsheet);
+    $writer->setDelimiter(';');
+    $writer->setUseBOM(true);
     $writer->save($fullResultFilepath);
     return Storage::download($resultFilePath);
 });
