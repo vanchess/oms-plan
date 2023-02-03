@@ -6410,11 +6410,17 @@ function miacHospitalByProfilePeriodsPrintTableHeader(
 function getOplat(string $daytimeOrRoundClock, string $hospitalSubType, int $bedProfileId): int
 {
     $rehabilitationBedProfileId = 32; // реабилитационные соматические;
+    $rehabilitationBedProfileId1 = 34; // Реабилитационные для больных с заболеваниями центральной нервной системы и органов чувств;
+    $rehabilitationBedProfileId2 = 35; // Реабилитационные для больных с заболеваниями опорно-двигательного аппарата и периферической нервной системы;
     $isVmp = ($hospitalSubType == 'vmp');
     if ($isVmp) {
         return 6; // ВМП
     }
-    if ($bedProfileId === $rehabilitationBedProfileId) {
+    if (
+        $bedProfileId === $rehabilitationBedProfileId
+        || $bedProfileId === $rehabilitationBedProfileId1
+        || $bedProfileId === $rehabilitationBedProfileId2
+    ) {
         return 7; // реабилитация
     }
     return 1; // специализированная
