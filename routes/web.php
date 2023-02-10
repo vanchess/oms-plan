@@ -5306,7 +5306,7 @@ Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?
     return Storage::download($resultFilePath);
 });
 
-Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null, Request $request) {
+Route::get('/{year}/{commissionDecisionsId?}', function (Request $request, DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     $onlyMoModifiedByCommission = boolval($request->exists("onlyModified"));
 
     $packageIds = null;
