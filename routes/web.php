@@ -5376,5 +5376,22 @@ Route::get('/{year}/{commissionDecisionsId?}', function (DataForContractService 
 
     $content = $peopleAssignedInfoForContractService->GetJson($year, $packageIds);
     Storage::put($path.'peopleAssignedData.json', $content);
-    return $content;
+
+    $files = Storage::files($path);
+
+    $zip = new ZipArchive();
+    $zipFileName = $path.$strDateTimeNow.'.zip';
+    $fullZipFileName = Storage::path($zipFileName);
+
+    if ($zip->open($fullZipFileName, ZipArchive::CREATE) !== TRUE) {
+        throw new \Exception('Cannot create a zip file');
+    }
+
+    foreach($files as $filepath){
+        $fullResultFilepath = Storage::path($filepath);
+        $zip->addFile($fullResultFilepath, "Json".DIRECTORY_SEPARATOR.basename($fullResultFilepath));
+    }
+    $zip->close();
+
+    return Storage::download($zipFileName);;
 });
