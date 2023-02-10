@@ -28,7 +28,7 @@ class CommissionDecisionController extends Controller
         }
         $year = (int)$validator->validated()['year'];
 
-        $cd = CommissionDecision::whereYear('date',$year)->get();
+        $cd = CommissionDecision::whereYear('date',$year)->orderBy('id')->get();
 
         return new CommissionDecisionCollection($cd);
     }
