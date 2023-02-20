@@ -3768,55 +3768,54 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
                                 $vmpTValueCasesOfTreatment = bcadd($vmpTValueCasesOfTreatment, $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
                                 $vmpTValuePatientDays = bcadd($vmpTValuePatientDays, $vmpT[$patientDaysIndicatorId] ?? '0');
                                 $vmpTValueCost = bcadd($vmpTValueCost, $vmpT[$costIndicatorId] ?? '0');
-
-                                if (bccomp($vmpTValueCasesOfTreatment, '0') !== 0) {
-                                    vitacoreHospitalByProfilePrintRow(
-                                        $sheet,
-                                        $firstTableColIndex,
-                                        $firstTableDataRowIndex + $rowOffset++,
-                                        $ordinalRowNum++,
-                                        $mo->code,
-                                        $mo->short_name,
-                                        $planningSectionName,
-                                        $cpf->name,
-                                        $cpf->code_v002,
-                                        $planningParamNames[$casesOfTreatmentIndicatorId],
-                                        $vmpTValueCasesOfTreatment,
-                                        $vmpGroups->find($vmpGroupId)->code
-                                    );
-                                }
-                                if (bccomp($vmpTValuePatientDays, '0') !== 0) {
-                                    vitacoreHospitalByProfilePrintRow(
-                                        $sheet,
-                                        $firstTableColIndex,
-                                        $firstTableDataRowIndex + $rowOffset++,
-                                        $ordinalRowNum++,
-                                        $mo->code,
-                                        $mo->short_name,
-                                        $planningSectionName,
-                                        $cpf->name,
-                                        $cpf->code_v002,
-                                        $planningParamNames[$patientDaysIndicatorId],
-                                        $vmpTValuePatientDays,
-                                        $vmpGroups->find($vmpGroupId)->code
-                                    );
-                                }
-                                if (bccomp($vmpTValueCost, '0') !== 0) {
-                                    vitacoreHospitalByProfilePrintRow(
-                                        $sheet,
-                                        $firstTableColIndex,
-                                        $firstTableDataRowIndex + $rowOffset++,
-                                        $ordinalRowNum++,
-                                        $mo->code,
-                                        $mo->short_name,
-                                        $planningSectionName,
-                                        $cpf->name,
-                                        $cpf->code_v002,
-                                        $planningParamNames[$costIndicatorId],
-                                        $vmpTValueCost,
-                                        $vmpGroups->find($vmpGroupId)->code
-                                    );
-                                }
+                            }
+                            if (bccomp($vmpTValueCasesOfTreatment, '0') !== 0) {
+                                vitacoreHospitalByProfilePrintRow(
+                                    $sheet,
+                                    $firstTableColIndex,
+                                    $firstTableDataRowIndex + $rowOffset++,
+                                    $ordinalRowNum++,
+                                    $mo->code,
+                                    $mo->short_name,
+                                    $planningSectionName,
+                                    $cpf->name,
+                                    $cpf->code_v002,
+                                    $planningParamNames[$casesOfTreatmentIndicatorId],
+                                    $vmpTValueCasesOfTreatment,
+                                    $vmpGroups->find($vmpGroupId)->code
+                                );
+                            }
+                            if (bccomp($vmpTValuePatientDays, '0') !== 0) {
+                                vitacoreHospitalByProfilePrintRow(
+                                    $sheet,
+                                    $firstTableColIndex,
+                                    $firstTableDataRowIndex + $rowOffset++,
+                                    $ordinalRowNum++,
+                                    $mo->code,
+                                    $mo->short_name,
+                                    $planningSectionName,
+                                    $cpf->name,
+                                    $cpf->code_v002,
+                                    $planningParamNames[$patientDaysIndicatorId],
+                                    $vmpTValuePatientDays,
+                                    $vmpGroups->find($vmpGroupId)->code
+                                );
+                            }
+                            if (bccomp($vmpTValueCost, '0') !== 0) {
+                                vitacoreHospitalByProfilePrintRow(
+                                    $sheet,
+                                    $firstTableColIndex,
+                                    $firstTableDataRowIndex + $rowOffset++,
+                                    $ordinalRowNum++,
+                                    $mo->code,
+                                    $mo->short_name,
+                                    $planningSectionName,
+                                    $cpf->name,
+                                    $cpf->code_v002,
+                                    $planningParamNames[$costIndicatorId],
+                                    $vmpTValueCost,
+                                    $vmpGroups->find($vmpGroupId)->code
+                                );
                             }
                         }
                     }
