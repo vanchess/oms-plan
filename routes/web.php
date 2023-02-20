@@ -3389,15 +3389,17 @@ function vitacoreHospitalByProfilePrintRow(
     string $profileName,
     string | int $profileCode,
     string $planningParamName,
-    string | int $value
+    string | int $value,
+    string | int $vmpGroupCode = ""
  ) {
     $moCodeColOffset = 1;
     $moNameColOffset = 2;
     $planningSectionColOffset = 3;
     $profileNameColOffset = 4;
     $profileCodeColOffset = 5;
-    $paramColOffset = 6;
-    $valueColOffset = 7;
+    $vmpGroupNumColOffset = 6;
+    $paramColOffset = 7;
+    $valueColOffset = 8;
 
     $sheet->setCellValue([$colIndex, $rowIndex], "$ordinalRowNum");
     $sheet->setCellValue([$colIndex + $moCodeColOffset, $rowIndex], $moCode);
@@ -3407,6 +3409,8 @@ function vitacoreHospitalByProfilePrintRow(
     $sheet->setCellValue([$colIndex + $profileCodeColOffset, $rowIndex], $profileCode);
     $sheet->setCellValue([$colIndex + $paramColOffset, $rowIndex], $planningParamName);
     $sheet->setCellValue([$colIndex + $valueColOffset, $rowIndex], $value);
+
+    $sheet->setCellValue([$colIndex + $vmpGroupNumColOffset, $rowIndex], $vmpGroupCode);
 
 }
 
@@ -3730,6 +3734,7 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
             }
         }
 
+        $vmpGroups = VmpGroup::all();
         $careProfiles = $content['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
         $careProfilesNumberOfBeds = $contentNumberOfBeds['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
         if ($careProfiles) {
@@ -3740,96 +3745,110 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
             $costIndicatorId = 4; // стоимость
 
             foreach ($careProfilesFoms as $cpf) {
-                $numberOfBeds = '0';
-                $casesOfTreatment = '0';
-                $patientDays = '0';
-                $cost = '0';
+
+                // $numberOfBeds = '0';
+                // $casesOfTreatment = '0';
+                // $patientDays = '0';
+                // $cost = '0';
 
                 $cpmz = $cpf->careProfilesMz;
                 foreach($cpmz as $cp) {
                     $vmpGroupsData = $careProfiles[$cp->id] ?? null;
-                    if (!$vmpGroupsData) { continue; }
 
-                    foreach ($vmpGroupsData as $vmpTypes) {
-                        foreach ($vmpTypes as $vmpT)
-                        {
-                            $casesOfTreatment = bcadd($casesOfTreatment, $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
-                            $patientDays = bcadd($patientDays, $vmpT[$patientDaysIndicatorId] ?? '0');
-                            $cost = bcadd($cost, $vmpT[$costIndicatorId] ?? '0');
+                    if ($vmpGroupsData) {
+                        foreach ($vmpGroupsData as $vmpGroupId => $vmpTypes) {
+                            $vmpTValueCasesOfTreatment = '0';
+                            $vmpTValuePatientDays = '0';
+                            $vmpTValueCost = '0';
+                            foreach ($vmpTypes as $vmpT)
+                            {
+                                //$casesOfTreatment = bcadd($casesOfTreatment, $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
+                                //$patientDays = bcadd($patientDays, $vmpT[$patientDaysIndicatorId] ?? '0');
+                                //$cost = bcadd($cost, $vmpT[$costIndicatorId] ?? '0');
+                                $vmpTValueCasesOfTreatment = bcadd($vmpTValueCasesOfTreatment, $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
+                                $vmpTValuePatientDays = bcadd($vmpTValuePatientDays, $vmpT[$patientDaysIndicatorId] ?? '0');
+                                $vmpTValueCost = bcadd($vmpTValueCost, $vmpT[$costIndicatorId] ?? '0');
+
+                                if (bccomp($vmpTValueCasesOfTreatment, '0') !== 0) {
+                                    vitacoreHospitalByProfilePrintRow(
+                                        $sheet,
+                                        $firstTableColIndex,
+                                        $firstTableDataRowIndex + $rowOffset++,
+                                        $ordinalRowNum++,
+                                        $mo->code,
+                                        $mo->short_name,
+                                        $planningSectionName,
+                                        $cpf->name,
+                                        $cpf->code_v002,
+                                        $planningParamNames[$casesOfTreatmentIndicatorId],
+                                        $vmpTValueCasesOfTreatment,
+                                        $vmpGroups->find($vmpGroupId)->code
+                                    );
+                                }
+                                if (bccomp($vmpTValuePatientDays, '0') !== 0) {
+                                    vitacoreHospitalByProfilePrintRow(
+                                        $sheet,
+                                        $firstTableColIndex,
+                                        $firstTableDataRowIndex + $rowOffset++,
+                                        $ordinalRowNum++,
+                                        $mo->code,
+                                        $mo->short_name,
+                                        $planningSectionName,
+                                        $cpf->name,
+                                        $cpf->code_v002,
+                                        $planningParamNames[$patientDaysIndicatorId],
+                                        $vmpTValuePatientDays,
+                                        $vmpGroups->find($vmpGroupId)->code
+                                    );
+                                }
+                                if (bccomp($vmpTValueCost, '0') !== 0) {
+                                    vitacoreHospitalByProfilePrintRow(
+                                        $sheet,
+                                        $firstTableColIndex,
+                                        $firstTableDataRowIndex + $rowOffset++,
+                                        $ordinalRowNum++,
+                                        $mo->code,
+                                        $mo->short_name,
+                                        $planningSectionName,
+                                        $cpf->name,
+                                        $cpf->code_v002,
+                                        $planningParamNames[$costIndicatorId],
+                                        $vmpTValueCost,
+                                        $vmpGroups->find($vmpGroupId)->code
+                                    );
+                                }
+                            }
                         }
                     }
-                }
-                foreach($cpmz as $cp) {
-                    $vmpGroupsData = $careProfilesNumberOfBeds[$cp->id] ?? null;
-                    if (!$vmpGroupsData) { continue; }
 
-                    foreach ($vmpGroupsData as $vmpTypes) {
-                        foreach ($vmpTypes as $vmpT)
-                        {
-                            $numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
+                    $vmpGroupsDataNumberOfBeds = $careProfilesNumberOfBeds[$cp->id] ?? null;
+                    if ($vmpGroupsDataNumberOfBeds) {
+                        foreach ($vmpGroupsDataNumberOfBeds as $vmpGroupId => $vmpTypes) {
+                            $vmpGroupValue = "0";
+                            foreach ($vmpTypes as $vmpT)
+                            {
+                                //$numberOfBeds = bcadd($numberOfBeds, $vmpT[$numberOfBedsIndicatorId] ?? '0');
+                                $vmpGroupValue = bcadd($vmpGroupValue, $vmpT[$numberOfBedsIndicatorId] ?? '0');
+
+                            }
+                            if (bccomp($vmpGroupValue, '0') !== 0) {
+                                vitacoreHospitalByProfilePrintRow(
+                                    $sheet,
+                                    $firstTableColIndex,
+                                    $firstTableDataRowIndex + $rowOffset++,
+                                    $ordinalRowNum++,
+                                    $mo->code,
+                                    $mo->short_name,
+                                    $planningSectionName,
+                                    $cpf->name,
+                                    $cpf->code_v002,
+                                    $planningParamNames[$numberOfBedsIndicatorId],
+                                    $vmpGroupValue,
+                                    $vmpGroups->find($vmpGroupId)->code
+                                );
+                            }
                         }
                     }
-                }
-
-                if (bccomp($numberOfBeds, '0') !== 0) {
-                    vitacoreHospitalByProfilePrintRow(
-                        $sheet,
-                        $firstTableColIndex,
-                        $firstTableDataRowIndex + $rowOffset++,
-                        $ordinalRowNum++,
-                        $mo->code,
-                        $mo->short_name,
-                        $planningSectionName,
-                        $cpf->name,
-                        $cpf->code_v002,
-                        $planningParamNames[$numberOfBedsIndicatorId],
-                        $numberOfBeds
-                    );
-                }
-                if (bccomp($casesOfTreatment, '0') !== 0) {
-                    vitacoreHospitalByProfilePrintRow(
-                        $sheet,
-                        $firstTableColIndex,
-                        $firstTableDataRowIndex + $rowOffset++,
-                        $ordinalRowNum++,
-                        $mo->code,
-                        $mo->short_name,
-                        $planningSectionName,
-                        $cpf->name,
-                        $cpf->code_v002,
-                        $planningParamNames[$casesOfTreatmentIndicatorId],
-                        $casesOfTreatment
-                    );
-                }
-                if (bccomp($patientDays, '0') !== 0) {
-                    vitacoreHospitalByProfilePrintRow(
-                        $sheet,
-                        $firstTableColIndex,
-                        $firstTableDataRowIndex + $rowOffset++,
-                        $ordinalRowNum++,
-                        $mo->code,
-                        $mo->short_name,
-                        $planningSectionName,
-                        $cpf->name,
-                        $cpf->code_v002,
-                        $planningParamNames[$patientDaysIndicatorId],
-                        $patientDays
-                    );
-                }
-                if (bccomp($cost, '0') !== 0) {
-                    vitacoreHospitalByProfilePrintRow(
-                        $sheet,
-                        $firstTableColIndex,
-                        $firstTableDataRowIndex + $rowOffset++,
-                        $ordinalRowNum++,
-                        $mo->code,
-                        $mo->short_name,
-                        $planningSectionName,
-                        $cpf->name,
-                        $cpf->code_v002,
-                        $planningParamNames[$costIndicatorId],
-                        $cost
-                    );
                 }
             }
         }
