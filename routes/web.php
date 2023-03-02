@@ -5057,23 +5057,27 @@ function getTs(string $daytimeOrRoundClock, string $hospitalSubType): int
     return -1;
 }
 
-function getLevel(int $ts, int $moId, int $bedProfileId) : string
+function getLevel(int $monthNum, int $ts, int $moId, int $bedProfileId) : string
 {
     $l1 = '1';
     $l2_1 = '2.1';
     $l2_2 = '2.2';
     $l3_1 = '3.1';
     $l3_2 = '3.2';
+    $l3_3 = '3.3';
+
+    $lResult = "ERROR";
 
     if ($ts === 2 || $ts === 4) {
-        return $l1;
+        $lResult = $l1;
     } elseif ($ts === 1) {
         switch ($moId) {
             case 17	/* ГБУ "Далматовская ЦРБ" */:
             case 20	/* ГБУ "Катайская ЦРБ" */:
             case 25	/* ГБУ "Шадринская ЦРБ" */:
             case 45	/* ООО "ЛДК "Центр ДНК" */:
-                return $l1;
+                $lResult = $l1;
+                break;
 
             case 89	/* ГБУ «Межрайонная больница №1» */:
             case 90	/* ГБУ «Межрайонная больница №2» */:
@@ -5083,13 +5087,15 @@ function getLevel(int $ts, int $moId, int $bedProfileId) : string
             case 94	/* ГБУ «Межрайонная больница №6» */:
             case 95	/* ГБУ «Межрайонная больница №7» */:
             case 96	/* ГБУ «Межрайонная больница №8» */:
-                return $l2_1;
+                $lResult = $l2_1;
+                break;
 
             case 7	/* ГБУ "Курганская областная специализированная инфекционная больница" */:
             case 38	/* ЧУЗ "РЖД-Медицина" г. Курган" */:
             case 51	/* ГБУ "Санаторий "Озеро Горькое" */:
             case 13	/* ГБУ «КОКВД» */:
-                return $l2_2;
+                $lResult = $l2_2;
+                break;
 
             case 97	/* ГБУ «Курганская областная больница №2» */ :
             case 11	/* ГБУ "Курганский областной кардиологический диспансер" */:
@@ -5099,14 +5105,44 @@ function getLevel(int $ts, int $moId, int $bedProfileId) : string
             case 40	/* ГБУ "Перинатальный центр" */:
             case 42	/* ФГБУ «НМИЦ ТО имени академика Г.А.Илизарова» Минздрава России */:
             case 12	/* ГБУ «КОДКБ им. Красного Креста» */:
-                return $l3_1;
+                $lResult = $l3_1;
+                break;
 
             case 2	/* ГБУ "КООД" */:
             case 67	/* ГБУ "КОГВВ" */:
-                return $l3_2;
+                $lResult = $l3_2;
+                break;
+        }
+
+        if ($monthNum > 1) {
+            switch ($moId) {
+                case 13	/* ГБУ «КОКВД» */:
+                case 38	/* ЧУЗ "РЖД-Медицина" г. Курган" */:
+                case 7	/* ГБУ "Курганская областная специализированная инфекционная больница" */:
+                    $lResult = $l2_1;
+                    break;
+
+                case 89	/* ГБУ «Межрайонная больница №1» */:
+                case 90	/* ГБУ «Межрайонная больница №2» */:
+                    $lResult = $l2_2;
+                    break;
+
+                case 1	/* ГБУ "КОКБ" */:
+                case 11	/* ГБУ "Курганский областной кардиологический диспансер" */:
+                case 12	/* ГБУ «КОДКБ им. Красного Креста» */:
+                case 40	/* ГБУ "Перинатальный центр" */:
+                case 42	/* ФГБУ «НМИЦ ТО имени академика Г.А.Илизарова» Минздрава России */:
+                    $lResult = $l3_2;
+                    break;
+
+                case 2	/* ГБУ "КООД" */:
+                case 67	/* ГБУ "КОГВВ" */:
+                    $lResult = $l3_3;
+                    break;
+            }
         }
     }
-    return "ERROR";
+    return $lResult;
 }
 
 function vmpBedProfileToCareProfileMzCollection(HospitalBedProfiles $hbp, string $moCode)
@@ -5307,7 +5343,7 @@ Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?
                         if (bccomp($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], '0')) {
                             miacHospitalByProfilePeriodsPrintRow(
                                 $sheet, $firstTableColIndex, $row++, $mo->code,
-                                $oplat, $ts, $hbp->code, $monthNum, getLevel($ts, $mo->id, $hbp->id),
+                                $oplat, $ts, $hbp->code, $monthNum, getLevel($monthNum, $ts, $mo->id, $hbp->id),
                                 $values[$mo->id][$oplat][$ts][$hbp->id][$monthNum]
                             );
                         }
