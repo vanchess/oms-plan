@@ -5339,8 +5339,17 @@ Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?
         foreach ($oplatOption as $oplat) {
             foreach ($tsOption as $ts) {
                 foreach ($hospitalBedProfiles as $hbp) {
+                    // Если объемы есть хотя бы на один месяц,
+                    // выводим информацию по всем месяцам (включая нулевые значения)
+                    $hasValue = false;
                     for($monthNum = 1; $monthNum <= 12; $monthNum++) {
-                        if (bccomp($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], '0')) {
+                        if(bccomp($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], '0') != 0) {
+                            $hasValue = true;
+                            break;
+                        }
+                    }
+                    if ($hasValue) {
+                    for($monthNum = 1; $monthNum <= 12; $monthNum++) {
                             miacHospitalByProfilePeriodsPrintRow(
                                 $sheet, $firstTableColIndex, $row++, $mo->code,
                                 $oplat, $ts, $hbp->code, $monthNum, getLevel($monthNum, $ts, $mo->id, $hbp->id),
