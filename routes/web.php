@@ -4879,16 +4879,8 @@ Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecision
                 $costIndicatorId = 4; // стоимость
 
                 foreach ($hospitalBedProfiles as $hbp) {
-                    // пропускаем профили:
-                    //  19 - Кардиохирургические
-                    //  29 - Для беременных и рожениц
-                    //  30 - Патологии беременности
-                    if ($hbp->id == 19 || $hbp->id == 29|| $hbp->id == 30) {
-                        continue;
-                    }
-                    // профиль койки относится к 1 профилю МП (на сегодняшний день так)
-                    $cpfoms = $hbp->careProfilesFoms[0];
-                    $cpmz = $cpfoms->careProfilesMz;
+
+                    $cpmz = vmpBedProfileToCareProfileMzCollection($hbp, $mo->code);
 
                     foreach($cpmz as $cp) {
                         $vmpGroupsData = $careProfiles[$cp->id] ?? null;
@@ -5147,6 +5139,7 @@ function getLevel(int $monthNum, int $ts, int $moId, int $bedProfileId) : string
 
 function vmpBedProfileToCareProfileMzCollection(HospitalBedProfiles $hbp, string $moCode)
 {
+
     if ($moCode === "450001" && $hbp->id == 19) {
 
     }
@@ -5169,6 +5162,37 @@ function vmpBedProfileToCareProfileMzCollection(HospitalBedProfiles $hbp, string
     $cpfoms = $hbp->careProfilesFoms[0];
     $cpmz = $cpfoms->careProfilesMz;
     return $cpmz;
+}
+
+function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup)
+{
+    if ($moCode === '450004' && ($vmpGroup === 23 || $vmpGroup === 24)) {
+        return 36; // Радиологические (V020 код: 64);
+    }
+    // пропускаем профили:
+    //  19 - Кардиохирургические
+    //  29 - Для беременных и рожениц
+    //  30 - Патологии беременности
+    //
+    //  Нет в ВМП
+    //  34 - Реабилитационные для больных с заболеваниями центральной нервной системы и органов чувств
+    //  35 - Реабилитационные для больных с заболеваниями опорно-двигательного аппарата и периферической нервной системы
+    $bedProfileNotUsedForVmp = [19, 29, 30, 34, 35];
+
+    $cp = CareProfiles::find($careProfileId);
+
+    $cpFomsCollection = $cp->careProfilesFoms;
+    $bpArr = [];
+    foreach ($cpFomsCollection as $cpFoms) {
+        $addBp = $cpFoms->hospitalBedProfiles->pluck('id')->toArray();
+        $bpArr = array_merge($bpArr, $addBp);
+    }
+    $bpArr = array_unique($bpArr, SORT_NUMERIC);
+    $bpArr = array_diff($bpArr, $bedProfileNotUsedForVmp);
+    if(count($bpArr) !== 1) {
+        throw("Error. Count " + count($bpArr));
+    }
+    return array_pop($bpArr);
 }
 
 Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
@@ -5311,22 +5335,19 @@ Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?
             $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$daytimeOrRoundClock][$hospitalSubType]['careProfiles'] ?? null;
 
             if ($careProfiles) {
-                foreach ($hospitalBedProfiles as $hbp) {
+                foreach ($careProfiles as $cpId => $vmpGroupsData)
+                {
+                    if (!$vmpGroupsData) { continue; }
 
-                    $cpmz = vmpBedProfileToCareProfileMzCollection($hbp, $mo->code);
-
-                    $oplat = getOplat($daytimeOrRoundClock, $hospitalSubType, $hbp->id);
                     $ts = getTs($daytimeOrRoundClock, $hospitalSubType);
+                    foreach ($vmpGroupsData as $vmpGroup => $vmpTypes) {
+                        $hbpId = vmpGetBedProfileId($cpId, $mo->code, $vmpGroup);
+                        $oplat = getOplat($daytimeOrRoundClock, $hospitalSubType, $hbpId);
 
-                    foreach($cpmz as $cp) {
-                        $vmpGroupsData = $careProfiles[$cp->id] ?? null;
-                        if (!$vmpGroupsData) { continue; }
-
-                        foreach ($vmpGroupsData as $vmpTypes) {
-                            foreach ($vmpTypes as $vmpT)
-                            {
-                                $values[$mo->id][$oplat][$ts][$hbp->id][$monthNum] = bcadd($values[$mo->id][$oplat][$ts][$hbp->id][$monthNum], $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
-                            }
+                        foreach ($vmpTypes as $vmpT)
+                        {
+                            $values[$mo->id][$oplat][$ts][$hbpId][$monthNum]
+                                = bcadd($values[$mo->id][$oplat][$ts][$hbpId][$monthNum], $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
                         }
                     }
                 }
