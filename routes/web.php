@@ -4849,6 +4849,11 @@ Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecision
 
         // ВМП
         $planningParamNames[3] = "объемы, койко-дней";
+        $planningSectionName = 'ВМП';
+        $numberOfBedsIndicatorId = 1; // число коек
+        $casesOfTreatmentIndicatorId = 7; // госпитализаций
+        $patientDaysIndicatorId = 3; // койко-дней
+        $costIndicatorId = 4; // стоимость
 
         $numberOfBeds = [];
         $casesOfTreatment = [];
@@ -4872,28 +4877,19 @@ Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecision
             $careProfiles = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['roundClock']['vmp']['careProfiles'] ?? null;
 
             if ($careProfiles) {
-                $planningSectionName = 'ВМП';
-                $numberOfBedsIndicatorId = 1; // число коек
-                $casesOfTreatmentIndicatorId = 7; // госпитализаций
-                $patientDaysIndicatorId = 3; // койко-дней
-                $costIndicatorId = 4; // стоимость
+                foreach ($careProfiles as $cpId => $vmpGroupsData)
+                {
+                    if (!$vmpGroupsData) { continue; }
 
-                foreach ($hospitalBedProfiles as $hbp) {
+                    foreach ($vmpGroupsData as $vmpGroup => $vmpTypes) {
+                        $hbpId = vmpGetBedProfileId($cpId, $mo->code, $vmpGroup);
 
-                    $cpmz = vmpBedProfileToCareProfileMzCollection($hbp, $mo->code);
-
-                    foreach($cpmz as $cp) {
-                        $vmpGroupsData = $careProfiles[$cp->id] ?? null;
-                        if (!$vmpGroupsData) { continue; }
-
-                        foreach ($vmpGroupsData as $vmpTypes) {
-                            foreach ($vmpTypes as $vmpT)
-                            {
-                                $numberOfBeds[$hbp->id][$monthNum] = bcadd($numberOfBeds[$hbp->id][$monthNum], $vmpT[$numberOfBedsIndicatorId] ?? '0');
-                                $casesOfTreatment[$hbp->id][$monthNum] = bcadd($casesOfTreatment[$hbp->id][$monthNum], $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
-                                $patientDays[$hbp->id][$monthNum] = bcadd($patientDays[$hbp->id][$monthNum], $vmpT[$patientDaysIndicatorId] ?? '0');
-                                $cost[$hbp->id][$monthNum] = bcadd($cost[$hbp->id][$monthNum], $vmpT[$costIndicatorId] ?? '0');
-                            }
+                        foreach ($vmpTypes as $vmpT)
+                        {
+                            $numberOfBeds[$hbpId][$monthNum] = bcadd($numberOfBeds[$hbpId][$monthNum], $vmpT[$numberOfBedsIndicatorId] ?? '0');
+                            $casesOfTreatment[$hbpId][$monthNum] = bcadd($casesOfTreatment[$hbpId][$monthNum], $vmpT[$casesOfTreatmentIndicatorId] ?? '0');
+                            $patientDays[$hbpId][$monthNum] = bcadd($patientDays[$hbpId][$monthNum], $vmpT[$patientDaysIndicatorId] ?? '0');
+                            $cost[$hbpId][$monthNum] = bcadd($cost[$hbpId][$monthNum], $vmpT[$costIndicatorId] ?? '0');
                         }
                     }
                 }
@@ -5135,33 +5131,6 @@ function getLevel(int $monthNum, int $ts, int $moId, int $bedProfileId) : string
         }
     }
     return $lResult;
-}
-
-function vmpBedProfileToCareProfileMzCollection(HospitalBedProfiles $hbp, string $moCode)
-{
-
-    if ($moCode === "450001" && $hbp->id == 19) {
-
-    }
-    if ($moCode === "450001" && $hbp->id == 66) {
-
-    }
-
-    // пропускаем профили:
-    //  19 - Кардиохирургические
-    //  29 - Для беременных и рожениц
-    //  30 - Патологии беременности
-    //
-    //  Нет в ВМП
-    //  34 - Реабилитационные для больных с заболеваниями центральной нервной системы и органов чувств
-    //  35 - Реабилитационные для больных с заболеваниями опорно-двигательного аппарата и периферической нервной системы
-    if ($hbp->id == 19 || $hbp->id == 29 || $hbp->id == 30 || $hbp->id == 34 || $hbp->id == 35) {
-        return [];
-    }
-    // профиль койки относится к 1 профилю МП (на сегодняшний день так)
-    $cpfoms = $hbp->careProfilesFoms[0];
-    $cpmz = $cpfoms->careProfilesMz;
-    return $cpmz;
 }
 
 function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup)
