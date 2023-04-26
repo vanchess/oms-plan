@@ -5129,6 +5129,14 @@ function getLevel(int $monthNum, int $ts, int $moId, int $bedProfileId) : string
                     break;
             }
         }
+
+        if ($monthNum > 3) {
+            switch ($moId) {
+                case 3	/* ГБУ "Курганская БСМП" */:
+                    $lResult = $l3_2;
+                    break;
+            }
+        }
     }
     return $lResult;
 }
