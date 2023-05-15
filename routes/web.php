@@ -2662,14 +2662,48 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', function (DataForC
 
         $v = 0;
         $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
-        foreach ($bedProfiles as $bp) {
+        foreach ($bedProfiles as $bpId => $bp) {
+            if (isRehabilitationBedProfile($bpId)) {
+                continue;
+            }
             $v += $bp[$indicatorId] ?? 0;
         }
 
         $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
-        foreach ($bedProfiles as $bp) {
+        foreach ($bedProfiles as $bpId => $bp) {
+            if (isRehabilitationBedProfile($bpId)) {
+                continue;
+            }
             $v += $bp[$indicatorId] ?? 0;
         }
+
+        $sheet->setCellValue([7,$rowIndex], $v);
+    }
+
+    $sheet = $spreadsheet->getSheetByName('9. Медреабилитация в ДС');
+    $ordinalRowNum = 0;
+    $rowIndex = 6;
+    $category = 'hospital';
+    $indicatorId = 2; // случаев лечения
+    $rehabilitationBedProfileIds = getAllRehabilitationBedProfileIds();
+    foreach($moCollection as $mo) {
+        $ordinalRowNum++;
+        $rowIndex++;
+        $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
+        $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+
+        $v = 0;
+        $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+        foreach ($rehabilitationBedProfileIds as $rbpId) {
+            $v += $bedProfiles[$rbpId][$indicatorId] ?? 0;
+        }
+
+        $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+        foreach ($rehabilitationBedProfileIds as $rbpId) {
+            $v += $bedProfiles[$rbpId][$indicatorId] ?? 0;
+        }
+
 
         $sheet->setCellValue([7,$rowIndex], $v);
     }
@@ -2911,7 +2945,7 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
         $sheet->setCellValue([12,$rowIndex], $perUnitAssistanceTypesSum);
     }
 
-
+    // ДС (не включая мед.реабилитацию)
     $sheet = $spreadsheet->getSheetByName('3. ДС, фин.обеспечение');
     $ordinalRowNum = 0;
     $rowIndex = 6;
@@ -2925,20 +2959,52 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
 
         $v = '0';
         $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
-        foreach ($bedProfiles as $bp) {
+        foreach ($bedProfiles as $bpId => $bp) {
+            if(isRehabilitationBedProfile($bpId)) {
+                continue;
+            }
             $v = bcadd($v, $bp[$indicatorId] ?? '0');
         }
 
         $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
-        foreach ($bedProfiles as $bp) {
+        foreach ($bedProfiles as $bpId => $bp) {
+            if(isRehabilitationBedProfile($bpId)) {
+                continue;
+            }
             $v = bcadd($v, $bp[$indicatorId] ?? '0');
         }
 
         $sheet->setCellValue([7,$rowIndex], $v);
     }
 
+    $sheet = $spreadsheet->getSheetByName('7 МР в ДС, фин.обеспечение');
+    $ordinalRowNum = 0;
+    $rowIndex = 6;
+    $category = 'hospital';
+    $rehabilitationBedProfileIds = getAllRehabilitationBedProfileIds();
+    foreach($moCollection as $mo) {
+        $ordinalRowNum++;
+        $rowIndex++;
+        $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+        $sheet->setCellValue([1,$rowIndex], $mo->code);
+        $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+
+        $v = '0';
+        $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inPolyclinic']['bedProfiles'] ?? [];
+        foreach ($rehabilitationBedProfileIds as $rbpId) {
+            $v = bcadd($v, $bedProfiles[$rbpId][$indicatorId] ?? '0');
+        }
+
+        $bedProfiles = $content['mo'][$mo->id][$category]['daytime']['inHospital']['bedProfiles'] ?? [];
+        foreach ($rehabilitationBedProfileIds as $rbpId) {
+            $v = bcadd($v, $bedProfiles[$rbpId][$indicatorId] ?? '0');
+        }
+
+        $sheet->setCellValue([7,$rowIndex], $v);
+    }
+
     // КС (не включая мед.реабилитацию и ВМП)
-    $sheet = $spreadsheet->getSheetByName('4 КС, фин.обеспечение ');
+    $sheet = $spreadsheet->getSheetByName('4 КС, фин.обеспечение');
     $ordinalRowNum = 0;
     $rowIndex = 6;
     $category = 'hospital';
@@ -2961,7 +3027,7 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', function (DataForCon
         $sheet->setCellValue([7,$rowIndex], $v);
     }
 
-    $sheet = $spreadsheet->getSheetByName('5 МР, фин.обеспечение ');
+    $sheet = $spreadsheet->getSheetByName('5 МР в КС, фин.обеспечение');
     $ordinalRowNum = 0;
     $rowIndex = 6;
     $category = 'hospital';
