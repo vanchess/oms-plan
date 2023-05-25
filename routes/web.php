@@ -4557,7 +4557,7 @@ Route::get('/{year}/{commissionDecisionsId?}', function (Request $request, DataF
     $files = Storage::files($path);
 
     $zip = new ZipArchive();
-    $zipFileName = $path.$strDateTimeNow.'.zip';
+    $zipFileName = $path.$strDateTimeNow.'_Protokol_'.$protocolNumber.'('.$protocolDate.').dogoms';
     $fullZipFileName = Storage::path($zipFileName);
 
     if ($zip->open($fullZipFileName, ZipArchive::CREATE) !== TRUE) {
