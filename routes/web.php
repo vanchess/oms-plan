@@ -4253,6 +4253,14 @@ function getLevel(int $monthNum, int $ts, int $moId, int $bedProfileId) : string
                     break;
             }
         }
+
+        if ($monthNum > 8) {
+            switch ($moId) {
+                case 40	/* ГБУ "Перинатальный центр" */:
+                    $lResult = $l3_3;
+                    break;
+            }
+        }
     }
     return $lResult;
 }
