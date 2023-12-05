@@ -6,6 +6,7 @@ use App\Models\ChangePackage;
 use App\Models\CommissionDecision;
 use App\Services\PlannedIndicatorChangeInitService;
 use App\Services\InitialDataFixingService;
+use App\Services\PlanReports\NumberOfBedsReportService;
 use App\Services\PlanReports\SummaryCostReportService;
 use App\Services\PlanReports\SummaryVolumeReportService as SummaryVolumeReportService;
 use Illuminate\Http\Request;
@@ -47,5 +48,21 @@ class PlanReports extends Controller
         $writer = new Xlsx($spreadsheet);
         $writer->save($fullResultFilepath);
         return Storage::download($resultFilePath);
+    }
+
+    public function NumberOfBeds(NumberOfBedsReportService $numberOfBedsReportService, int $year, int $commissionDecisionsId = null) {
+        $xml = $numberOfBedsReportService->generateXml('plan.reports.xml.numberOfBedsXml', $year, $commissionDecisionsId);
+        $strDateTimeNow = date("Y-m-d-His");
+        $fileneme = $strDateTimeNow . '_numberOfBeds.xml';
+
+        //dd( $xml);
+        return response($xml, 200)
+                    ->withHeaders([
+                        'Content-Type' => 'text/xml',
+                        'Cache-Control' => 'no-cache',
+                        'Content-Description' => 'File Transfer',
+                        'Content-Disposition' => 'attachment; filename=' . $fileneme,
+                        'Content-Transfer-Encoding' => 'binary'
+                    ]);
     }
 }

@@ -824,7 +824,7 @@ function vitacoreHospitalByProfilePeriodsPrintTableHeader(
     vitacoreHospitalByProfilePeriodsPrintRow($sheet, $colIndex, $rowIndex, "", "", "", "", "", "", "", $months);
 }
 
-
+Route::get('/hospitalization-portal/{year}/{commissionDecisionsId?}', [PlanReports::class, "NumberOfBeds"]);
 
 Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
