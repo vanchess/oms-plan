@@ -19,14 +19,14 @@ class UsedMedicalAssistanceTypeController extends Controller
     public function medicalAssistanceTypesUsedForNodeId(Request $request, NodeService $nodeService)
     {
         $validator = Validator::make($request->all(),[
-            'node' => 'required|integer|min:1|max:40'
+            'node' => 'required|integer|min:1|max:45'
         ]);
         if ($validator->fails()) {
             return response()->json($validator->errors()->toJson(), 400);
         }
         $nodeId = $request->node;
-        
-        return $nodeService->medicalAssistanceTypesForNodeId($nodeId); 
+
+        return $nodeService->medicalAssistanceTypesForNodeId($nodeId);
     }
 
 }
