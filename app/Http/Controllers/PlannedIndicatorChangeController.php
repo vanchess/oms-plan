@@ -25,7 +25,7 @@ class PlannedIndicatorChangeController extends Controller
     {
         $validator = Validator::make($request->all(),[
             'nodes'   => 'required|array',
-            'nodes.*' => 'required|integer|min:1|max:40',
+            'nodes.*' => 'required|integer|min:1|max:45',
             'year' => 'required|integer|min:2020|max:2099'
         ]);
         if ($validator->fails()) {

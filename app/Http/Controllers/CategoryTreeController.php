@@ -12,7 +12,7 @@ class CategoryTreeController extends Controller
     public function nodeWithChildren(Validator $v, NodeService $nodeService, int $nodeId)
     {
         $validator = $v->make(['node' => $nodeId],[
-            'node' => 'required|integer|min:1|max:40'
+            'node' => 'required|integer|min:1|max:45'
         ]);
         if ($validator->fails()) {
             return response()->json($validator->errors()->toJson(), 400);
@@ -24,7 +24,7 @@ class CategoryTreeController extends Controller
     public function getCategoryTree(Validator $v, NodeService $nodeService, int $rootNodeId)
     {
         $validator = $v->make(['node' => $rootNodeId],[
-            'node' => 'required|integer|min:1|max:40'
+            'node' => 'required|integer|min:1|max:45'
         ]);
         if ($validator->fails()) {
             return response()->json($validator->errors()->toJson(), 400);

@@ -25,7 +25,7 @@ class NumberOfBedsReportService
             $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
             $cd = $commissionDecisions->find($commissionDecisionsId);
             $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
-            $protocolDate = $cd->date->format('d.m.Y');
+            // $protocolDate = $cd->date->format('d.m.Y');
             $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
 
             $currentlyUsedDate = $cd->date->format('Y-m-d');
