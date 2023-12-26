@@ -166,6 +166,105 @@ class SummaryVolumeReportService {
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
         $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
 
+        $sheet = clone $spreadsheet->getSheetByName('2.1 Мед. реабилитация амб.усл.');
+        $sheet->setTitle('2.2 Диспансерное наблюдение');
+        $spreadsheet->addSheet($sheet, 3);
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год (диспансерное наблюдение)");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [9, 10, 11, 12]; //	эндокринология, онкология, БСК (болезни системы кровообращения), прочее
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([8,$rowIndex], $v);
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $v = 0;
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $fap = 0;
+                    foreach ($faps as $f) {
+                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    }
+                    $v += ($perPerson + $perUnit + $fap);
+                }
+                $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+
+
+        $sheet = $spreadsheet->getSheetByName('2.1 Мед. реабилитация амб.усл.');
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год (медицинская реабилитация)");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [8]; //	медицинская реабилитация
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([8,$rowIndex], $v);
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $v = 0;
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $fap = 0;
+                    foreach ($faps as $f) {
+                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    }
+                    $v += ($perPerson + $perUnit + $fap);
+                }
+                $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+
 
         $sheet = $spreadsheet->getSheetByName('3.Посещения с иными целями');
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, посещения с иными целями");
@@ -264,62 +363,95 @@ class SummaryVolumeReportService {
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
         $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
 
+        $sheetSectionNumber = 2;
+        $sheetSubsectionNumber = 2;
+        $sheetSubsectionNumber++;
+        $sheetName = "КТ";
         $servicesIndicatorId = 6; // услуг
         $sheet = $spreadsheet->getSheetByName('2.2 КТ');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::KT;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (компьютерная томография)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSubsectionNumber++;
+        $sheetName = "МРТ";
         $sheet = $spreadsheet->getSheetByName('2.3 МРТ');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::MRT;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (магнитно-резонансная томография)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSubsectionNumber++;
+        $sheetName = "УЗИ ССС";
         $sheet = $spreadsheet->getSheetByName('2.4 УЗИ ССС');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::UltrasoundCardio;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (УЗИ сердечно-сосудистой системы)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSubsectionNumber++;
+        $sheetName = "Эндоскопия";
         $sheet = $spreadsheet->getSheetByName('2.5 Эндоскопия');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::Endoscopy;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (Эндоскопические исследования)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSubsectionNumber++;
+        $sheetName = "ПАИ";
         $sheet = $spreadsheet->getSheetByName('2.6 ПАИ');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::PathologicalAnatomicalBiopsyMaterial;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (Паталого анатомическое исследование биопсийного материала с целью диагностики онкологических заболеваний)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSubsectionNumber++;
+        $sheetName = "МГИ";
         $sheet = $spreadsheet->getSheetByName('2.7 МГИ');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::MolecularGeneticDetectionOncological;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (Малекулярно-генетические исследования с целью диагностики онкологических заболеваний)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSubsectionNumber++;
+        $sheetName = "Тест.covid-19";
         $sheet = $spreadsheet->getSheetByName('2.8  Тест.covid-19');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::CovidTesting;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (Тестирование на выявление covid-19)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSectionNumber = 3;
+        $sheetSubsectionNumber = 3;
+        $sheetName = "УЗИ плода";
         $sheet = $spreadsheet->getSheetByName('3.3 УЗИ плода');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::FetalUltrasound;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, УЗИ плода (1 триместр)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSubsectionNumber++;
+        $sheetName = "Компл.иссл. репрод.орг.";
         $sheet = $spreadsheet->getSheetByName('3.4 Компл.иссл. репрод.орг.');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::DiagnosisBackgroundPrecancerousDiseasesReproductiveWomen;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, комплексное исследование для диагностики фоновых и предраковых заболеваний репродуктивных органов у женщин");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
+        $sheetSubsectionNumber++;
+        $sheetName = "Опред.антигена D";
         $sheet = $spreadsheet->getSheetByName('3.5 Опред.антигена D');
+        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
         $serviceId = MedicalServicesEnum::DeterminationAntigenD;
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, определение антигена D системы Резус (резус-фактор плода)");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
