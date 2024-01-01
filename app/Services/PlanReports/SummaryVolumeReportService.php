@@ -315,6 +315,117 @@ class SummaryVolumeReportService {
         $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
 
 
+        $sheet = $spreadsheet->getSheetByName('3.1 Диспансеризация');
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, диспансеризация");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $depthAssistanceTypeId = [14]; // диспансеризация углубленная
+        $assistanceTypeIds = [13, 14, 15, 16]; //	диспансеризация, диспансеризация углубленная, диспансеризация детей-сирот, диспансеризация опекаемых детей
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([8,$rowIndex], $v);
+
+            $v = 0;
+            foreach($depthAssistanceTypeId as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([9,$rowIndex], $v);
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $v = 0;
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $fap = 0;
+                    foreach ($faps as $f) {
+                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    }
+                    $v += ($perPerson + $perUnit + $fap);
+                }
+                $sheet->setCellValue([9 + $monthNum, $rowIndex],  $v);
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+
+        $sheet = $spreadsheet->getSheetByName('3.2 Профилактические осмотры');
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, диспансеризация");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [17, 18]; //	взрослые, несовершеннолетние
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([8,$rowIndex], $v);
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $v = 0;
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $fap = 0;
+                    foreach ($faps as $f) {
+                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    }
+                    $v += ($perPerson + $perUnit + $fap);
+                }
+                $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+
         $sheet = $spreadsheet->getSheetByName('4 Неотложная помощь');
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, неотложная помощь");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");

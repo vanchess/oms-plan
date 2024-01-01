@@ -57,9 +57,9 @@ class DataForContractService
 
         $ambulanceNodeIds = [17];
 
-        $polyclinicNodeIds = [9,10,11,12,28,29,30,31,32,33,40,41];
+        $polyclinicNodeIds = [9,10,11,12,28,29,30,31,32,33,40,41,42,43];
         $polyclinicPerPersonNodeIds = [10,28,32];
-        $polyclinicPerUnitNodeIds = [11,30,31,40,41];
+        $polyclinicPerUnitNodeIds = [11,30,31,40,41,42,43];
         $polyclinicFapNodeIds = [12,29,33];
 
         $dataSql = DB::table((new PlannedIndicator())->getTable().' as pi')
