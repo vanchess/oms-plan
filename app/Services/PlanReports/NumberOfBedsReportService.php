@@ -21,6 +21,7 @@ class NumberOfBedsReportService
     ) {}
 
     public function generateXml(string $bladeTemplateName, int $year, int $commissionDecisionsId = null) {
+        $currentlyUsedDate = $year.'-01-01';
         if ($commissionDecisionsId) {
             $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
             $cd = $commissionDecisions->find($commissionDecisionsId);
