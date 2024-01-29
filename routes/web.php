@@ -3565,7 +3565,7 @@ Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecision
 
     bcscale(4);
 
-    $indicatorIds = [2, 3, 4, 7]; // 1 - количество коек (убрано, не грузится витакор)
+    $indicatorIds = [2, 3, 4, 7, 1]; //  - количество коек (убрано, не грузится витакор)
     $contentByMonth = [];
     for($monthNum = 1; $monthNum <= 12; $monthNum++)
     {
