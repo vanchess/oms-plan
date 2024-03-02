@@ -9,6 +9,7 @@ use App\Services\InitialDataFixingService;
 use App\Services\PlanReports\NumberOfBedsReportService;
 use App\Services\PlanReports\SummaryCostReportService;
 use App\Services\PlanReports\SummaryVolumeReportService as SummaryVolumeReportService;
+use App\Services\PlanReports\PumpPggReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -64,5 +65,22 @@ class PlanReports extends Controller
                         'Content-Disposition' => 'attachment; filename=' . $fileneme,
                         'Content-Transfer-Encoding' => 'binary'
                     ]);
+    }
+
+    public function PumpPgg (PumpPggReportService $reportService, int $year, int $commissionDecisionsId = null) {
+        $path = 'xlsx' . DIRECTORY_SEPARATOR . 'pump';
+        $templateFileName = 'PumpPgg_v6.xlsx';
+        $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
+        $templateFullFilepath = Storage::path($templateFilePath);
+        $resultFileName = 'Приложение №2.11 Шаблон плановые объёмы v6.xlsx';
+        $strDateTimeNow = date("Y-m-d-His");
+        $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+        $fullResultFilepath = Storage::path($resultFilePath);
+
+        $spreadsheet = $reportService->generate($templateFullFilepath, year: $year, commissionDecisionsId: $commissionDecisionsId);
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($fullResultFilepath);
+        return Storage::download($resultFilePath);
     }
 }

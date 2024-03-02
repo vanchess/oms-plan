@@ -11,17 +11,23 @@ use App\Models\ChangePackage;
 use App\Models\CommissionDecision;
 use App\Models\HospitalBedProfiles;
 use App\Models\Indicator;
+use App\Models\IndicatorType;
 use App\Models\InitialData;
 use App\Models\MedicalAssistanceType;
 use Illuminate\Support\Facades\Route;
 use App\Models\MedicalInstitution;
 use App\Models\MedicalServices;
+use App\Models\OmsProgram;
 use App\Models\Organization;
 use App\Models\Period;
 
 use App\Services\InitialDataService;
 use App\Models\PlannedIndicator;
 use App\Models\PlannedIndicatorChange;
+use App\Models\PumpMonitoringProfiles;
+use App\Models\PumpMonitoringProfilesRelationType;
+use App\Models\PumpMonitoringProfilesUnit;
+use App\Models\PumpUnit;
 use App\Models\VmpGroup;
 use App\Models\VmpTypes;
 use App\Services\DataForContractService;
@@ -33,11 +39,14 @@ use App\Services\MoInfoForContractService;
 use App\Services\PeopleAssignedInfoForContractService;
 use App\Services\PlannedIndicatorChangeInitService;
 use App\Services\PlanReports\PlanCalculatorService;
+use App\Services\PumpMonitoringProfilesTreeService;
 use App\Services\RehabilitationProfileService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Calculation\TextData\Trim;
 use PhpOffice\PhpSpreadsheet\Shared\StringHelper;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -68,41 +77,213 @@ Route::get('/createPeriods/{year}', function (int $year) {
     return 'ok';
 });
 
-Route::get('/321123', function (InitialDataService $initialDataService) {
+function printTree($tree, $treeService, $l = 0) {
+    if ($tree === null) return;
+    foreach ($tree as $k => $t) {
+        $mp = PumpMonitoringProfiles::find($k);
+        $pu = $mp->profilesUnits;
+        echo str_repeat("\t", $l) . $mp->name . ' [' . PumpMonitoringProfilesRelationType::find($mp->relation_type_id)?->name . "]\r\n";
 
-    $nodeId = 4;
-    $userId = 1;
+        foreach($pu as $u) {
+            $pi = $u->plannedIndicators;
+            $piIdsViaChild = $treeService->plannedIndicatorIdsViaChild($mp->id, $u->unit->id);
+            $piIds = array_column($pi?->ToArray(), 'id');
+            $piIdsViaChild = array_diff($piIdsViaChild, $piIds);
+            $piViaChild = PlannedIndicator::whereIn('id', $piIdsViaChild)->get();
 
-    $medicalInstitutions = MedicalInstitution::OrderBy('order')->get();
+            if (count($pi) > 0 || count($piIdsViaChild) > 0) {
+                foreach($pi as $i) {
+                    $piName = plannedIndicatorName($i);
+                    echo str_repeat("\t", $l) . "-{$u->unit->name} |{$piName}|\r\n";
+                }
+                foreach($piViaChild as $i) {
+                    $piName = plannedIndicatorName($i);
+                    echo str_repeat("\t", $l) . "-{$u->unit->name} |{$piName}| (УНАСЛЕДОВАНО)\r\n";
+                }
+            } else {
+                echo str_repeat("\t", $l) . "-{$u->unit->name} | не утверждается | \r\n";
+            }
+        }
 
+        printTree($t, $treeService, $l + 1);
+    }
+}
 
-    foreach ($medicalInstitutions as $mo) {
-        foreach (PlannedIndicator::all() as $pi) {
+function plannedIndicatorName($i) {
+    return "({$i->id}) {$i->assistanceType?->name} {$i->careProfile?->name} {$i->indicator?->name} {$i->bedProfile?->name} {$i->service?->name} {$i->vmpGroup?->code} {$i->vmpType?->name} {$i->node->nodePath()}";
+}
 
-            $dto = new InitialDataValueDto(
-                    year: 2021,
-                    moId: $mo->id,
-                    plannedIndicatorId: $pi->id,
-                    value: 2021 + $mo->id + $pi->id,
-                    userId: $userId
-                );
+Route::get('/pump-plan', function (PumpMonitoringProfilesTreeService $treeService) {
+    /*
+    $baseOmsProgram = OmsProgram::where('name','базовая')->first();
+    $monitoringProfiles = PumpMonitoringProfiles::where('oms_program_id',$baseOmsProgram->id)->get();
+    foreach ($monitoringProfiles as $p) {
+        echo $p->name . '<br>';
+    }
+*/
+    $tree = $treeService->nodeTree(1);
+    printTree($tree, $treeService);
+    // dd($tree);
+    return 'ok';
+});
 
-            $initialDataService->setValue($dto);
+/**
+ * Заполнить связь профилей мониторинга ПУМП и наших плановых показателей
+ */
+Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', function () {
+    $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
+    $path = 'xlsx/pump';
+    $templateFileName = 'PumpPgg2.xlsx';
+    $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
+    $templateFullFilepath = Storage::path($templateFilePath);
+
+    $spreadsheet = $reader->load($templateFullFilepath);
+    $sheet = $spreadsheet->getActiveSheet();
+    $startRow = 8;
+    $endRow = 548;
+
+    $monitoringProfileCodeCol = 2;
+    $monitoringProfileNameCol = 1;
+    $plannedIndicatorIdCol = 3;
+
+    $typeFinId = IndicatorType::where('name', 'money')->first()->id;
+    $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+
+    $num = 1;
+    for ($i=$startRow; $i <= $endRow; $i++) {
+        $name = trim($sheet->getCell([$monitoringProfileNameCol, $i])->getValue());
+        $code = trim($sheet->getCell([$monitoringProfileCodeCol, $i])->getValue());
+        $indicatorsTemp = explode(',', trim($sheet->getCell([$plannedIndicatorIdCol, $i])->getValue()));
+        $indicators = [];
+        for ($k = 0; $k < count($indicatorsTemp); $k++) {
+            $ind = trim($indicatorsTemp[$k]);
+            if ($ind !== '') {
+                array_push($indicators, $ind);
+            }
+        }
+        $indicators = array_unique($indicators, SORT_NUMERIC);
+        $monitoringProfile = PumpMonitoringProfiles::where('code', $code)->first();
+        $t = str_starts_with($name, $monitoringProfile->name);
+
+        $p = 'ERROR';
+        $monitoringProfileUnits = null;
+        if (str_ends_with($name, '(сумма)')) {
+            $p = 'финансовая часть';
+            $monitoringProfileUnits = $monitoringProfile->profilesUnits()->whereHas('unit', function (Builder $query) use ($typeFinId) {
+                    $query->where('type_id', $typeFinId);
+                })->get();
+        } else if (str_ends_with($name, '(кол-во)')) {
+            $p = 'количественная часть';
+            $monitoringProfileUnits = $monitoringProfile->profilesUnits()->whereHas('unit', function (Builder $query) use ($typeQuantId) {
+                $query->where('type_id', $typeQuantId);
+            })->get();
+        }
+        foreach ($monitoringProfileUnits as $u) {
+            echo $num++ . ') ' . ($t ? 'OK  ' : 'ERROR  ') . $p . ' ' . $u->unit->name . ' ' . $monitoringProfile->name . ' ' . $code . '<br>';
+            if (count($indicators) > 0) {
+                $u->plannedIndicators()->attach($indicators);
+            }
         }
     }
-
-    return 'OK';
-    /*
-    $medicalInstitutions = MedicalInstitution::OrderBy('order')->get();
-    foreach ($medicalInstitutions as $mo) {
-        $org = Organization::Where('inn',$mo->inn)->first();
-        $mo->organization_id = $org->id;
-        $mo->save();
-    }
-    */
-    return 'OK';
-
+/**/
+    return 'ок';
     //phpinfo();
+});
+
+/**
+ * Заполнить профили мониторинга ПУМП из файла
+ */
+Route::get('/fill-pump-monitoring-profiles', function () {
+    $FIN_PROFILE_TYPE_STR = "только финансовая часть";
+    $FIN_QUANT_PROFILE_TYPE_STR = "финансовая и количественная часть";
+
+
+    OmsProgram::firstOrCreate(['name' => 'базовая']);
+    OmsProgram::firstOrCreate(['name' => 'сверхбазовая']);
+
+    PumpUnit::firstOrCreate(['name' => 'вызов', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'законченный случай', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'исследование', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'койко-день', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'комплексное посещение', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'обращение', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'посещение', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'случай госпитализации', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'случай лечения', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'услуга', 'type_id' => 1]);
+    PumpUnit::firstOrCreate(['name' => 'стоимость', 'type_id' => 2]);
+
+    PumpMonitoringProfilesRelationType::firstOrCreate(['name' => 'сумма', 'slug' => 'sum']);
+    PumpMonitoringProfilesRelationType::firstOrCreate(['name' => 'в том числе', 'slug' => 'including']);
+
+    $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
+    $path = 'xlsx/pump';
+    $templateFileName = 'PumpMonitoringProfiles_v3.xlsx';
+    $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
+    $templateFullFilepath = Storage::path($templateFilePath);
+
+    $spreadsheet = $reader->load($templateFullFilepath);
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $omsProgramCol = 1;
+    // $recIdCol = 2;
+    // $parentRecIdCol = 3;
+    $monitoringProfileCodeCol = 4;
+    $monitoringProfileParentCodeCol = 5;
+    $monitoringProfileShortNameCol = 6;
+    $monitoringProfileNameCol = 7;
+    $parentRelationCol = 8;
+    $monitoringProfileTypeCol = 9;
+    $unitCol = 10;
+
+    $iterator = $sheet->getRowIterator();
+    $iterator->next();
+    while ($iterator->valid()) {
+        $row = $iterator->current();
+        // ПрограммаОМС ИД ИДродителя Код КодРодителя КраткоеНаименование ПолноеНаименование ОтношениеКРодителю СоставПоказателя КоличественнаяЕдиница
+        $p = new PumpMonitoringProfiles();
+        $omsProgramName = trim(mb_strtolower($sheet->getCell([$omsProgramCol, $row->getRowIndex()])->getValue()));
+        if ($omsProgramName === '') {
+            break;
+        }
+        $omsProgram = OmsProgram::firstOrCreate(['name' => $omsProgramName]);
+        $p->oms_program_id = $omsProgram->id;
+        $p->code = trim($sheet->getCell([$monitoringProfileCodeCol, $row->getRowIndex()])->getValue());
+        $parentCode = trim($sheet->getCell([$monitoringProfileParentCodeCol, $row->getRowIndex()])->getValue());
+
+        if ($parentCode != '') {
+            $parent = PumpMonitoringProfiles::where('code', $parentCode)->first();
+            $p->parent_id = $parent->id;
+        }
+        $p->short_name = trim($sheet->getCell([$monitoringProfileShortNameCol, $row->getRowIndex()])->getValue());
+        $p->name = trim($sheet->getCell([$monitoringProfileNameCol, $row->getRowIndex()])->getCalculatedValue());
+        $rT =  mb_strtolower($sheet->getCell([$parentRelationCol, $row->getRowIndex()])->getValue());
+        if ($rT != '') {
+            $relationType = PumpMonitoringProfilesRelationType::firstOrCreate(['name' => $rT]);
+            $p->relation_type_id = $relationType->id;
+        }
+        $profileType = trim(mb_strtolower($sheet->getCell([$monitoringProfileTypeCol, $row->getRowIndex()])->getValue()));
+        $p->is_leaf = false;
+
+        $p->save();
+
+        $unit = new PumpMonitoringProfilesUnit();
+        $unit->unit_id = PumpUnit::where('name', 'стоимость')->first()->id;
+        $unit->monitoring_profile_id = $p->id;
+        $unit->save();
+
+        if ($profileType === $FIN_QUANT_PROFILE_TYPE_STR) {
+            $unitName = $profileType = trim(mb_strtolower($sheet->getCell([$unitCol, $row->getRowIndex()])->getValue()));
+            $unit2 = new PumpMonitoringProfilesUnit();
+            $unit2->unit_id = PumpUnit::where('name', $unitName)->first()->id;
+            $unit2->monitoring_profile_id = $p->id;
+            $unit2->save();
+        }
+
+        $iterator->next();
+    }
+
+    return 'ок';
 });
 
 Route::get('/initial_changes', function () {
@@ -2124,6 +2305,8 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', [PlanReports::clas
 
 
 Route::get('/summary-cost/{year}/{commissionDecisionsId?}', [PlanReports::class, "SummaryCost"]);
+
+Route::get('/pump-pgg/{year}/{commissionDecisionsId?}', [PlanReports::class, "PumpPgg"]);
 
 
 Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int $commissionDecisionsId = null) {
