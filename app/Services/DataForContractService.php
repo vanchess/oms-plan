@@ -36,6 +36,10 @@ class DataForContractService
         ]);
     }
 
+    public function GetGroupedByMoAndPlannedIndicatorArray(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
+        return $this->CreateDataGroupedByMoAndPlannedIndicator($year, $packageIds, $indicatorIds)->toArray();
+    }
+
     private function CreateDataByYearAndMonth(int $year, int $monthNum, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]) {
         $periodIds = $this->periodService->getIdsByYearAndMonth($year, $monthNum);
         $data = $this->CreateDataByPeriodIds($periodIds, $packageIds, $indicatorIds);
@@ -43,6 +47,42 @@ class DataForContractService
         return collect([
             'mo' => $data
         ]);
+    }
+
+    private function CreateRawData(array $periodIds, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
+        $dataSql = DB::table((new PlannedIndicator())->getTable().' as pi')
+        ->selectRaw('SUM(value) as value, node_id, indicator_id, service_id, profile_id, assistance_type_id, care_profile_id, vmp_group_id, vmp_type_id, mo_id, planned_indicator_id, mo_department_id')
+        //->leftJoin((new Indicator())->getTable().' as ind','pi.indicator_id','=','ind.id')
+        ->leftJoin((new PlannedIndicatorChange())->getTable().' as pic', 'pi.id', '=', 'pic.planned_indicator_id');
+        if ($packageIds) {
+            $dataSql = $dataSql->whereIn('package_id',$packageIds);
+        }
+        if ($moIds) {
+            $dataSql = $dataSql->whereIn('mo_id',$moIds);
+        }
+        //
+        $dataSql = $dataSql->whereIn('indicator_id', $indicatorIds)
+        ->whereIn('period_id', $periodIds)
+        ->whereNull('pic.deleted_at')
+        ->groupBy('node_id', 'indicator_id', 'service_id', 'profile_id', 'assistance_type_id', 'care_profile_id', 'vmp_group_id', 'vmp_type_id', 'mo_id', 'planned_indicator_id', 'mo_department_id');
+
+        return $dataSql->get();
+    }
+
+    private function CreateDataGroupedByMoAndPlannedIndicator(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
+        $periodIds = $this->periodService->getIdsByYear($year);
+        $data = $this->CreateDataGroupedByMoAndPlannedIndicatorByPeriodIds($periodIds, $packageIds, $indicatorIds, $moIds);
+
+        return collect([
+            'year' => $year,
+            'mo' => $data
+        ]);
+    }
+
+    private function CreateDataGroupedByMoAndPlannedIndicatorByPeriodIds(array $periodIds, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
+        $data = $this->CreateRawData($periodIds, $packageIds, $indicatorIds, $moIds);
+        $data = $data->groupBy(['mo_id','planned_indicator_id']);
+        return $data;
     }
 
     private function CreateDataByPeriodIds(array $periodIds, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
@@ -62,23 +102,7 @@ class DataForContractService
         $polyclinicPerUnitNodeIds = [11,30,31,40,41,42,43];
         $polyclinicFapNodeIds = [12,29,33];
 
-        $dataSql = DB::table((new PlannedIndicator())->getTable().' as pi')
-        ->selectRaw('SUM(value) as value, node_id, indicator_id, service_id, profile_id, assistance_type_id, care_profile_id, vmp_group_id, vmp_type_id, mo_id, planned_indicator_id, mo_department_id')
-        //->leftJoin((new Indicator())->getTable().' as ind','pi.indicator_id','=','ind.id')
-        ->leftJoin((new PlannedIndicatorChange())->getTable().' as pic', 'pi.id', '=', 'pic.planned_indicator_id');
-        if ($packageIds) {
-            $dataSql = $dataSql->whereIn('package_id',$packageIds);
-        }
-        if ($moIds) {
-            $dataSql = $dataSql->whereIn('mo_id',$moIds);
-        }
-        //
-        $dataSql = $dataSql->whereIn('indicator_id', $indicatorIds)
-        ->whereIn('period_id', $periodIds)
-        ->whereNull('pic.deleted_at')
-        ->groupBy('node_id', 'indicator_id', 'service_id', 'profile_id', 'assistance_type_id', 'care_profile_id', 'vmp_group_id', 'vmp_type_id', 'mo_id', 'planned_indicator_id', 'mo_department_id');
-
-        $data = $dataSql->get();
+        $data = $this->CreateRawData($periodIds, $packageIds, $indicatorIds, $moIds);
 
         $data = $data->groupBy([
             'mo_id',

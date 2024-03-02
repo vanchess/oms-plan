@@ -2306,6 +2306,8 @@ Route::get('/summary-volume/{year}/{commissionDecisionsId?}', [PlanReports::clas
 
 Route::get('/summary-cost/{year}/{commissionDecisionsId?}', [PlanReports::class, "SummaryCost"]);
 
+Route::get('/pump-pgg/{year}/{commissionDecisionsId?}', [PlanReports::class, "PumpPgg"]);
+
 
 Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
