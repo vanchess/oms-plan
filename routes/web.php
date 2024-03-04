@@ -79,10 +79,11 @@ Route::get('/createPeriods/{year}', function (int $year) {
 
 function printTree($tree, $treeService, $l = 0) {
     if ($tree === null) return;
+    $marginLeft = ($l * 2) . '0px';
     foreach ($tree as $k => $t) {
         $mp = PumpMonitoringProfiles::find($k);
         $pu = $mp->profilesUnits;
-        echo str_repeat("\t", $l) . $mp->name . ' [' . PumpMonitoringProfilesRelationType::find($mp->relation_type_id)?->name . "]\r\n";
+        echo "<nobr style='margin-left:{$marginLeft};word-wrap: normal;'>{$mp->name} [" . PumpMonitoringProfilesRelationType::find($mp->relation_type_id)?->name . "]</nobr>\r\n";
 
         foreach($pu as $u) {
             $pi = $u->plannedIndicators;
@@ -94,14 +95,14 @@ function printTree($tree, $treeService, $l = 0) {
             if (count($pi) > 0 || count($piIdsViaChild) > 0) {
                 foreach($pi as $i) {
                     $piName = plannedIndicatorName($i);
-                    echo str_repeat("\t", $l) . "-{$u->unit->name} |{$piName}|\r\n";
+                    echo "<nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} |{$piName}|</nobr>\r\n";
                 }
                 foreach($piViaChild as $i) {
                     $piName = plannedIndicatorName($i);
-                    echo str_repeat("\t", $l) . "-{$u->unit->name} |{$piName}| (УНАСЛЕДОВАНО)\r\n";
+                    echo "<nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} |{$piName}| (УНАСЛЕДОВАНО)</nobr>\r\n";
                 }
             } else {
-                echo str_repeat("\t", $l) . "-{$u->unit->name} | не утверждается | \r\n";
+                echo "<nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} | не утверждается | </nobr>\r\n";
             }
         }
 
@@ -122,7 +123,9 @@ Route::get('/pump-plan', function (PumpMonitoringProfilesTreeService $treeServic
     }
 */
     $tree = $treeService->nodeTree(1);
+    echo "<div style='word-wrap: normal;'>";
     printTree($tree, $treeService);
+    echo "</div>";
     // dd($tree);
     return 'ok';
 });
