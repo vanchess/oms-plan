@@ -83,7 +83,7 @@ function printTree($tree, $treeService, $l = 0) {
     foreach ($tree as $k => $t) {
         $mp = PumpMonitoringProfiles::find($k);
         $pu = $mp->profilesUnits;
-        echo "<nobr style='margin-left:{$marginLeft};word-wrap: normal;'>{$mp->name} [" . PumpMonitoringProfilesRelationType::find($mp->relation_type_id)?->name . "]</nobr>\r\n";
+        echo "<p><b><nobr style='margin-left:{$marginLeft};word-wrap: normal;'>{$mp->name} [" . PumpMonitoringProfilesRelationType::find($mp->relation_type_id)?->name . "]</nobr></b></p>\r\n";
 
         foreach($pu as $u) {
             $pi = $u->plannedIndicators;
@@ -95,14 +95,14 @@ function printTree($tree, $treeService, $l = 0) {
             if (count($pi) > 0 || count($piIdsViaChild) > 0) {
                 foreach($pi as $i) {
                     $piName = plannedIndicatorName($i);
-                    echo "<nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} |{$piName}|</nobr>\r\n";
+                    echo "<p><nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} |{$piName}|</nobr></p>\r\n";
                 }
                 foreach($piViaChild as $i) {
                     $piName = plannedIndicatorName($i);
-                    echo "<nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} |{$piName}| (УНАСЛЕДОВАНО)</nobr>\r\n";
+                    echo "<p><i><nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} |{$piName}| (УНАСЛЕДОВАНО)</nobr></i></p>\r\n";
                 }
             } else {
-                echo "<nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} | не утверждается | </nobr>\r\n";
+                echo "<p><nobr style='margin-left:{$marginLeft};word-wrap: normal;'>-{$u->unit->name} | не утверждается | </nobr></p>\r\n";
             }
         }
 
@@ -4371,7 +4371,7 @@ function getLevel(int $year, int $monthNum, int $ts, int $moId, int $bedProfileI
                     $lResult = $l1;
                     break;
 
-                
+
                 case 91	/* ГБУ «Межрайонная больница №3» */:
                 case 92	/* ГБУ «Межрайонная больница №4» */:
                 case 93	/* ГБУ «Межрайонная больница №5» */:
@@ -4387,7 +4387,7 @@ function getLevel(int $year, int $monthNum, int $ts, int $moId, int $bedProfileI
 
                 case 89	/* ГБУ «Межрайонная больница №1» */:
                 case 90	/* ГБУ «Межрайонная больница №2» */:
-                case 98	/* ГБУ "ШГБ" */: 
+                case 98	/* ГБУ "ШГБ" */:
                     $lResult = $l2_2;
                     break;
 
@@ -4395,14 +4395,14 @@ function getLevel(int $year, int $monthNum, int $ts, int $moId, int $bedProfileI
                 case 42	/* ФГБУ «НМИЦ ТО имени академика Г.А.Илизарова» Минздрава России */:
                     $lResult = $l3_1;
                     break;
-                
+
                 case 1	/* ГБУ "КОКБ" */:
                 case 11	/* ГБУ "Курганский областной кардиологический диспансер" */:
                 case 12	/* ГБУ «КОДКБ им. Красного Креста» */:
                 case 3	/* ГБУ "Курганская БСМП" */:
                     $lResult = $l3_2;
                     break;
-                    
+
                 case 2	/* ГБУ "КООД" */:
                 case 67	/* ГБУ "КОГВВ" */:
                 case 40	/* ГБУ "Перинатальный центр" */:
