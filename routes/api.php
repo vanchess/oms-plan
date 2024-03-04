@@ -26,6 +26,7 @@ use App\Http\Controllers\InitialDataLoadedController;
 use App\Http\Controllers\PeriodController;
 use App\Http\Controllers\PlannedIndicatorChangeController;
 use App\Http\Controllers\PlannedIndicatorController;
+use App\Http\Controllers\PumpMonitoringProfilesTreeController;
 use App\Http\Controllers\UsedCareProfilesController;
 use App\Http\Controllers\VmpGroupController;
 use App\Http\Controllers\VmpTypesController;
@@ -76,6 +77,7 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('periods', PeriodController::class);
         Route::apiResource('commission-decision', CommissionDecisionController::class);
         Route::apiResource('change-package', ChangePackageController::class);
+        Route::get('/pump-monitoring-profiles-tree/{rootNodeId}', [PumpMonitoringProfilesTreeController::class, 'getTree']);
     });
 
 
