@@ -1013,20 +1013,22 @@ Route::get('/hospitalization-portal/{year}/{commissionDecisionsId?}', [PlanRepor
 Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
+    $protocolNumber = 0;
+    $protocolDate = '';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
-        $protocolDate = $cd->date->format('d.m.Y');
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
-
+        $protocolNumber = $cd->number;
+        $protocolDate = $cd->date->format('d.m.Y');
         $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
 
     $path = 'xlsx';
-    $resultFileName = 'vitacore.xlsx';
+    $resultFileName = 'vitacore-plan' . ($protocolNumber !== 0 ? '(Protokol_№'.$protocolNumber.'ot'.$protocolDate.')' : '') . '.xlsx';
     $strDateTimeNow = date("Y-m-d-His");
     $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
     $fullResultFilepath = Storage::path($resultFilePath);
@@ -2315,12 +2317,15 @@ Route::get('/pump-pgg/{year}/{commissionDecisionsId?}', [PlanReports::class, "Pu
 Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
+    $protocolNumber = 0;
+    $protocolDate = '';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
-
+        $protocolNumber = $cd->number;
+        $protocolDate = $cd->date->format('d.m.Y');
         $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         if ($initialDataFixingService->fixedYear($year)) {
@@ -2330,9 +2335,9 @@ Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (Dat
         }
     }
     $path = 'xlsx';
-    $resultFileName = 'hospital.xlsx';
+    $resultFileName = 'hospital_' . ($protocolNumber !== 0 ? '(Protokol_№'.$protocolNumber.'ot'.$protocolDate.')' : '') . '.xlsx';
     $strDateTimeNow = date("Y-m-d-His");
-    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . '_' . $resultFileName;
     $fullResultFilepath = Storage::path($resultFilePath);
 
     bcscale(4);
@@ -2719,20 +2724,23 @@ function vitacoreHospitalByProfilePrintRow(
 Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
+    $protocolNumber = 0;
+    $protocolDate = '';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
-
+        $protocolNumber = $cd->number;
+        $protocolDate = $cd->date->format('d.m.Y');
         $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
     $path = 'xlsx';
-    $resultFileName = 'hospital.xlsx';
+    $resultFileName = 'hospital-medical-care-profiles' . ($protocolNumber !== 0 ? '(Protokol_№'.$protocolNumber.'ot'.$protocolDate.')' : '') . '.xlsx';
     $strDateTimeNow = date("Y-m-d-His");
-    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . '_' . $resultFileName;
     $fullResultFilepath = Storage::path($resultFilePath);
 
     bcscale(4);
@@ -3164,20 +3172,23 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
 Route::get('/vitacore-hospital-by-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
+    $protocolNumber = 0;
+    $protocolDate = '';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
-
+        $protocolNumber = $cd->number;
+        $protocolDate = $cd->date->format('d.m.Y');
         $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
     $path = 'xlsx';
-    $resultFileName = 'hospital-periods.xlsx';
+    $resultFileName = 'hospital-medical-care-profiles-by-period' . ($protocolNumber !== 0 ? '(Protokol_№'.$protocolNumber.'ot'.$protocolDate.')' : '') . '.xlsx';
     $strDateTimeNow = date("Y-m-d-His");
-    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . '_' . $resultFileName;
     $fullResultFilepath = Storage::path($resultFilePath);
 
     bcscale(4);
@@ -3733,20 +3744,23 @@ Route::get('/vitacore-hospital-by-profile-periods/{year}/{commissionDecisionsId?
 Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
+    $protocolNumber = 0;
+    $protocolDate = '';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
-
+        $protocolNumber = $cd->number;
+        $protocolDate = $cd->date->format('d.m.Y');
         $currentlyUsedDate = $cd->date->format('Y-m-d');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
     $path = 'xlsx';
-    $resultFileName = 'hospital-periods.xlsx';
+    $resultFileName = 'hospital-bed-profiles-by-period' . ($protocolNumber !== 0 ? '(Protokol_№'.$protocolNumber.'ot'.$protocolDate.')' : '') . '.xlsx';
     $strDateTimeNow = date("Y-m-d-His");
-    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . '_' . $resultFileName;
     $fullResultFilepath = Storage::path($resultFilePath);
 
     bcscale(4);
@@ -4537,20 +4551,23 @@ function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup)
 Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
+    $protocolNumber = 0;
+    $protocolDate = '';
     if ($commissionDecisionsId) {
         $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
         $cd = $commissionDecisions->find($commissionDecisionsId);
         $commissionDecisionIds = $commissionDecisions->pluck('id')->toArray();
         $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
-
+        $protocolNumber = $cd->number;
         $currentlyUsedDate = $cd->date->format('Y-m-d');
+        $protocolDate = $cd->date->format('d.m.Y');
     } else {
         $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
     }
     $path = 'xlsx';
-    $resultFileName = 'hospital-periods.csv';
+    $resultFileName = 'Plan_ProfileBed' . ($protocolNumber !== 0 ? '(Protokol_№'.$protocolNumber.'ot'.$protocolDate.')' : '') . '.csv';
     $strDateTimeNow = date("Y-m-d-His");
-    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . '_' .  $resultFileName;
     $fullResultFilepath = Storage::path($resultFilePath);
 
     bcscale(4);

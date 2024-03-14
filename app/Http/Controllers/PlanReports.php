@@ -22,7 +22,7 @@ class PlanReports extends Controller
         $templateFileName = '1.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
-        $resultFileName = 'объемы.xlsx';
+        $resultFileName = "объемы($year-$commissionDecisionsId).xlsx";
         $strDateTimeNow = date("Y-m-d-His");
         $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
         $fullResultFilepath = Storage::path($resultFilePath);
@@ -39,7 +39,7 @@ class PlanReports extends Controller
         $templateFileName = '2.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
-        $resultFileName = 'стоимость.xlsx';
+        $resultFileName = "стоимость($year-$commissionDecisionsId).xlsx";
         $strDateTimeNow = date("Y-m-d-His");
         $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
         $fullResultFilepath = Storage::path($resultFilePath);
@@ -72,9 +72,9 @@ class PlanReports extends Controller
         $templateFileName = 'PumpPgg_v6.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
-        $resultFileName = 'Приложение №2.11 Шаблон плановые объёмы v6.xlsx';
+        $resultFileName = "Приложение №2.11 Шаблон плановые объёмы v6($year-$commissionDecisionsId).xlsx";
         $strDateTimeNow = date("Y-m-d-His");
-        $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+        $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . '_' . $resultFileName;
         $fullResultFilepath = Storage::path($resultFilePath);
 
         $spreadsheet = $reportService->generate($templateFullFilepath, year: $year, commissionDecisionsId: $commissionDecisionsId);
