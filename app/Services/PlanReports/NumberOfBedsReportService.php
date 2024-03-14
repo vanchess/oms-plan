@@ -22,6 +22,7 @@ class NumberOfBedsReportService
 
     public function generateXml(string $bladeTemplateName, int $year, int $commissionDecisionsId = null) {
         $currentlyUsedDate = $year.'-01-01';
+        $dateBeg = '01.01.' . $year;
         if ($commissionDecisionsId) {
             $commissionDecisions = CommissionDecision::whereYear('date',$year)->where('id', '<=', $commissionDecisionsId)->get();
             $cd = $commissionDecisions->find($commissionDecisionsId);
@@ -30,6 +31,7 @@ class NumberOfBedsReportService
             $packageIds = ChangePackage::whereIn('commission_decision_id', $commissionDecisionIds)->orWhere('commission_decision_id', null)->pluck('id')->toArray();
 
             $currentlyUsedDate = $cd->date->format('Y-m-d');
+            $dateBeg = $cd->date->format('d.m.Y');
         } else {
             if ($this->initialDataFixingService->fixedYear($year)) {
                 $packageIds = ChangePackage::where('commission_decision_id', null)->pluck('id')->toArray();
@@ -46,6 +48,10 @@ class NumberOfBedsReportService
         $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
         $hospitalBedProfiles = HospitalBedProfiles::all();
 
-        return View($bladeTemplateName)->with("moCollection", $moCollection)->with('content', $content)->with('hospitalBedProfiles', $hospitalBedProfiles);
+        return View($bladeTemplateName)
+                ->with("moCollection", $moCollection)
+                ->with('content', $content)
+                ->with('hospitalBedProfiles', $hospitalBedProfiles)
+                ->with('dateBeg', $dateBeg);
     }
 }

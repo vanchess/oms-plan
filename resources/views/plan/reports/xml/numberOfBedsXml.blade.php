@@ -9,7 +9,7 @@
         <PROFIL>
           <PR_OMS>{{$profile->code}}</PR_OMS>
           <KOIKI>{{sprintf('%d',$content['mo'][$mo->id]['hospital']['roundClock']['regular']['bedProfiles'][$profile->id][1] ?? 0)}}</KOIKI>
-          <DATEBEG>01.01.2024</DATEBEG>
+          <DATEBEG>{{$dateBeg}}</DATEBEG>
         </PROFIL>
 @endforeach
       </TS_DATA>
