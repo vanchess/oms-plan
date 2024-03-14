@@ -54,7 +54,7 @@ class PlanReports extends Controller
     public function NumberOfBeds(NumberOfBedsReportService $numberOfBedsReportService, int $year, int $commissionDecisionsId = null) {
         $xml = $numberOfBedsReportService->generateXml('plan.reports.xml.numberOfBedsXml', $year, $commissionDecisionsId);
         $strDateTimeNow = date("Y-m-d-His");
-        $fileneme = $strDateTimeNow . '_numberOfBeds.xml';
+        $fileneme = "{$strDateTimeNow}_numberOfBeds($year-$commissionDecisionsId).xml";
 
         //dd( $xml);
         return response($xml, 200)
