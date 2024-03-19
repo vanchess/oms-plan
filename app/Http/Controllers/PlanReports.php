@@ -20,12 +20,15 @@ class PlanReports extends Controller
     public function MeetingMinutes(MeetingMinutesReportService $reportService, int $year, int $commissionDecisionsId) {
         $cd = CommissionDecision::find($commissionDecisionsId);
         $protocolDate = $cd->date->format('d.m.Y');
+        $protocolNumber = $cd->number;
+        $protocolNumberForFileName = preg_replace('/[^a-zа-я\d.]/ui', '_', $protocolNumber);
 
         $path = 'xlsx';
         $templateFileName = 'meetingMinutes.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
-        $resultFileName = "protocol_№$cd->number($protocolDate).xlsx";
+
+        $resultFileName = "protocol_№$protocolNumberForFileName($protocolDate).xlsx";
         $strDateTimeNow = date("Y-m-d-His");
         $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
         $fullResultFilepath = Storage::path($resultFilePath);
