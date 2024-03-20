@@ -12,6 +12,7 @@ use App\Models\PumpMonitoringProfilesUnit;
 use App\Services\DataForContractService;
 use App\Services\InitialDataFixingService;
 use App\Services\PlannedIndicatorChangeInitService;
+use App\Services\PumpMonitoringProfilesTreeService;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -27,7 +28,8 @@ class PumpPggReportService
     public function __construct(
         private DataForContractService $dataForContractService,
         private PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService,
-        private InitialDataFixingService $initialDataFixingService
+        private InitialDataFixingService $initialDataFixingService,
+        private PumpMonitoringProfilesTreeService $pumpMonitoringProfilesTreeService
     ) {}
 
     private function getColMap(Worksheet $sheet): array {
@@ -105,8 +107,21 @@ class PumpPggReportService
 
     private function monitoringProfilesUnitValuesGroupedByMo(array $monitoringProfilesUnitIds, array $contentGroupedByMoAndPlannedIndicator) : array {
         $moIds = array_keys($contentGroupedByMoAndPlannedIndicator['mo']);
+        /*
         $tblPumpMonitoringProfilesUnitPlannedIndicators = (new PumpMonitoringProfilesUnit())->plannedIndicators()->getTable();
-        $monitoringProfilesUnitPlannedIndicators = DB::table($tblPumpMonitoringProfilesUnitPlannedIndicators)->select('monitoring_profile_unit_id','planned_indicator_id')->get()->groupBy(['monitoring_profile_unit_id'])->toArray();
+        $monitoringProfilesUnitPlannedIndicators = DB::table($tblPumpMonitoringProfilesUnitPlannedIndicators)
+            ->select('monitoring_profile_unit_id','planned_indicator_id')
+            ->get()
+            ->groupBy(['monitoring_profile_unit_id'])
+            ->toArray();
+        */
+        $monitoringProfilesUnitPlannedIndicators = [];
+        foreach ($monitoringProfilesUnitIds as $mpuId) {
+            if (!is_int($mpuId)) {
+                continue;
+            }
+            $monitoringProfilesUnitPlannedIndicators[$mpuId] = $this->pumpMonitoringProfilesTreeService->plannedIndicatorIdsViaChildByMonitoringProfilesUnitId((int)$mpuId);
+        }
 
         $contentByMonitoringProfilesUnit = [];
 
@@ -122,8 +137,8 @@ class PumpPggReportService
                 if ($piIds !== null) {
                     $v = '0';
                     foreach ($piIds as $piId) {
-                        if (isset($moContent[$piId->planned_indicator_id])) {
-                            $v = bcadd($v, ($moContent[$piId->planned_indicator_id][0]->value ?? '0'));
+                        if (isset($moContent[$piId])) {
+                            $v = bcadd($v, ($moContent[$piId][0]->value ?? '0'));
                         }
                     }
                     $contentByMonitoringProfilesUnit[$moId][$mpuId] = $v;

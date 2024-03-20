@@ -4,12 +4,13 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\PumpMonitoringProfiles;
+use App\Models\PumpMonitoringProfilesUnit;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class PumpMonitoringProfilesTreeService
 {
-    public function plannedIndicatorIdsViaChild(int $nodeId, int $unitId)
+    public function plannedIndicatorIdsViaChild(int $nodeId, int $unitId) : Array
     {
         $monitoringProfileIds = $this->nodeWithChildrenIds($nodeId);
 
@@ -23,6 +24,12 @@ class PumpMonitoringProfilesTreeService
         }
         $bpArr = array_unique($arr, SORT_NUMERIC);
         return $bpArr;
+    }
+
+    public function plannedIndicatorIdsViaChildByMonitoringProfilesUnitId(int $monitoringProfilesUnitId)
+    {
+        $mpu = PumpMonitoringProfilesUnit::find($monitoringProfilesUnitId);
+        return $this->plannedIndicatorIdsViaChild($mpu->monitoring_profile_id, $mpu->unit_id);
     }
 
     private function nodeWithChildren(int $nodeId)
