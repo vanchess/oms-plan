@@ -32,8 +32,12 @@ class PumpMonitoringProfilesTreeService
         return $this->plannedIndicatorIdsViaChild($mpu->monitoring_profile_id, $mpu->unit_id);
     }
 
-    private function nodeWithChildren(int $nodeId)
+    private function nodeWithChildren(int $nodeId, \DateTime $dt = null)
     {
+        $dtStr = date('Y-m-d');
+        if ($dt !== null) {
+            $dtStr = $dt->format('Y-m-d');
+        }
         /*
         $res = DB::select("with RECURSIVE cte as
             (
@@ -46,9 +50,14 @@ class PumpMonitoringProfilesTreeService
             [$nodeId]
             );
         */
-        $query = PumpMonitoringProfiles::select('id', 'parent_id')->join('cte', 'parent_id', '=', 'cte.node_id');
-        $nodes = PumpMonitoringProfiles::select('id', 'parent_id')->where('id', '=', $nodeId)->unionAll($query);
-        $res = DB::select("WITH recursive cte (node_id, node_parent_id) AS ({$nodes->toSql()}) select node_id as id, node_parent_id as parent_id from cte order by node_id;", [$nodeId]);
+        $query = PumpMonitoringProfiles::select('id', 'parent_id')
+            ->WhereRaw("? BETWEEN effective_from AND effective_to", [$dtStr])
+            ->join('cte', 'parent_id', '=', 'cte.node_id');
+        $nodes = PumpMonitoringProfiles::select('id', 'parent_id')->where('id', '=', $nodeId)
+            ->WhereRaw("? BETWEEN effective_from AND effective_to", [$dtStr])
+            ->unionAll($query);
+        $res = DB::select("WITH recursive cte (node_id, node_parent_id) AS ({$nodes->toSql()}) select node_id as id, node_parent_id as parent_id from cte order by node_id;",
+                        [$nodeId, $dtStr, $dtStr]);
         return $res;
 
     }

@@ -77,7 +77,7 @@ Route::get('/createPeriods/{year}', function (int $year) {
     return 'ok';
 });
 
-function printTree($tree, $treeService, $l = 0) {
+function printTree($tree, PumpMonitoringProfilesTreeService $treeService, int $l = 0) {
     if ($tree === null) return;
     $marginLeft = ($l * 2) . '0px';
     foreach ($tree as $k => $t) {
@@ -194,13 +194,13 @@ Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', fu
 });
 
 /**
- * Заполнить профили мониторинга ПУМП из файла
+ * Заполнить профили мониторинга ПУМП из файла (Обновить на новую версию)
  */
 Route::get('/fill-pump-monitoring-profiles', function () {
     $FIN_PROFILE_TYPE_STR = "только финансовая часть";
     $FIN_QUANT_PROFILE_TYPE_STR = "финансовая и количественная часть";
 
-
+    /*
     OmsProgram::firstOrCreate(['name' => 'базовая']);
     OmsProgram::firstOrCreate(['name' => 'сверхбазовая']);
 
@@ -218,10 +218,11 @@ Route::get('/fill-pump-monitoring-profiles', function () {
 
     PumpMonitoringProfilesRelationType::firstOrCreate(['name' => 'сумма', 'slug' => 'sum']);
     PumpMonitoringProfilesRelationType::firstOrCreate(['name' => 'в том числе', 'slug' => 'including']);
+    */
 
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
     $path = 'xlsx/pump';
-    $templateFileName = 'PumpMonitoringProfiles_v3.xlsx';
+    $templateFileName = 'PumpMonitoringProfiles_v4.xlsx';
     $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
     $templateFullFilepath = Storage::path($templateFilePath);
 
@@ -239,7 +240,23 @@ Route::get('/fill-pump-monitoring-profiles', function () {
     $monitoringProfileTypeCol = 9;
     $unitCol = 10;
 
+
+    // TODO: Получить список всех программ ОМС описанных в файле
+    $omsProgramIds =
+    [
+        OmsProgram::where('name', 'базовая')->first()->id,
+        OmsProgram::where('name', 'сверхбазовая')->first()->id
+    ];
+    $dtNow = \Carbon\Carbon::now();
+    PumpMonitoringProfiles
+        ::whereIn('oms_program_id', $omsProgramIds)
+        ->where('effective_to', '>', $dtNow)
+        ->update(['effective_to' => $dtNow]);
+
     $iterator = $sheet->getRowIterator();
+
+    // TODO: Проверить заголовки
+
     $iterator->next();
     while ($iterator->valid()) {
         $row = $iterator->current();
@@ -249,7 +266,10 @@ Route::get('/fill-pump-monitoring-profiles', function () {
         if ($omsProgramName === '') {
             break;
         }
-        $omsProgram = OmsProgram::firstOrCreate(['name' => $omsProgramName]);
+        $omsProgram = OmsProgram::where('name', $omsProgramName)->first();
+        if ($omsProgram === null) {
+            throw("Программа ОМС '$omsProgramName' отсутствует в базе");
+        }
         $p->oms_program_id = $omsProgram->id;
         $p->code = trim($sheet->getCell([$monitoringProfileCodeCol, $row->getRowIndex()])->getValue());
         $parentCode = trim($sheet->getCell([$monitoringProfileParentCodeCol, $row->getRowIndex()])->getValue());
@@ -262,25 +282,49 @@ Route::get('/fill-pump-monitoring-profiles', function () {
         $p->name = trim($sheet->getCell([$monitoringProfileNameCol, $row->getRowIndex()])->getCalculatedValue());
         $rT =  mb_strtolower($sheet->getCell([$parentRelationCol, $row->getRowIndex()])->getValue());
         if ($rT != '') {
-            $relationType = PumpMonitoringProfilesRelationType::firstOrCreate(['name' => $rT]);
+            $relationType = PumpMonitoringProfilesRelationType::where('name', $rT)->first();
+            if ($relationType === null) {
+                throw("Неизвестный тип отношения к родителю: $rT");
+            }
             $p->relation_type_id = $relationType->id;
         }
         $profileType = trim(mb_strtolower($sheet->getCell([$monitoringProfileTypeCol, $row->getRowIndex()])->getValue()));
         $p->is_leaf = false;
 
-        $p->save();
+        // Ищем в базе показатель с таким кодом
+        $pOld = PumpMonitoringProfiles::where('code', $p->code)->first();
+        if ($pOld !== null) {
+            if ($pOld->oms_program_id !== $p->oms_program_id
+                || $pOld->parentCode !== $p->parentCode
+                || $pOld->parent_id !== $p->parent_id
+                || $pOld->short_name !== $p->short_name
+                || $pOld->name !== $p->name
+                || $pOld->relation_type_id !== $p->relation_type_id
+            ) {
+                throw("Профиль мониторинга с кодом $p->code существует и имеет значения отличные от полученных");
+            } else {
+                // TODO
+                // Что делать если показатель вновь появился после перерыва (не использовался какой-то период)
+                // менять ли effective_from ???
 
-        $unit = new PumpMonitoringProfilesUnit();
-        $unit->unit_id = PumpUnit::where('name', 'стоимость')->first()->id;
-        $unit->monitoring_profile_id = $p->id;
-        $unit->save();
+                $pOld->effective_to = \Carbon\Carbon::create(9999, 12, 31, 23, 59, 59);
+                $pOld->save();
+            }
+        } else {
+            $p->save();
 
-        if ($profileType === $FIN_QUANT_PROFILE_TYPE_STR) {
-            $unitName = $profileType = trim(mb_strtolower($sheet->getCell([$unitCol, $row->getRowIndex()])->getValue()));
-            $unit2 = new PumpMonitoringProfilesUnit();
-            $unit2->unit_id = PumpUnit::where('name', $unitName)->first()->id;
-            $unit2->monitoring_profile_id = $p->id;
-            $unit2->save();
+            $unit = new PumpMonitoringProfilesUnit();
+            $unit->unit_id = PumpUnit::where('name', 'стоимость')->first()->id;
+            $unit->monitoring_profile_id = $p->id;
+            $unit->save();
+
+            if ($profileType === $FIN_QUANT_PROFILE_TYPE_STR) {
+                $unitName = $profileType = trim(mb_strtolower($sheet->getCell([$unitCol, $row->getRowIndex()])->getValue()));
+                $unit2 = new PumpMonitoringProfilesUnit();
+                $unit2->unit_id = PumpUnit::where('name', $unitName)->first()->id;
+                $unit2->monitoring_profile_id = $p->id;
+                $unit2->save();
+            }
         }
 
         $iterator->next();

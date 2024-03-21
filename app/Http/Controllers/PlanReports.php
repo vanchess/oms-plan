@@ -93,10 +93,11 @@ class PlanReports extends Controller
 
     public function PumpPgg (PumpPggReportService $reportService, int $year, int $commissionDecisionsId = null) {
         $path = 'xlsx' . DIRECTORY_SEPARATOR . 'pump';
-        $templateFileName = 'PumpPgg_v6.xlsx';
+        $v = 'v7';
+        $templateFileName = "PumpPgg_$v.xlsx";
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
-        $resultFileName = "Приложение №2.11 Шаблон плановые объёмы v6($year-$commissionDecisionsId).xlsx";
+        $resultFileName = "Приложение №2.11 Шаблон плановые объёмы $v($year-$commissionDecisionsId).xlsx";
         $strDateTimeNow = date("Y-m-d-His");
         $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . '_' . $resultFileName;
         $fullResultFilepath = Storage::path($resultFilePath);
