@@ -5,10 +5,19 @@ namespace App\Services\PlanReports;
 
 use App\Enum\MedicalServicesEnum;
 use App\Models\CareProfilesFoms;
+use App\Models\Category;
+use App\Models\CategoryTreeNodes;
 use App\Models\CommissionDecision;
+use App\Models\Indicator;
+use App\Models\IndicatorType;
+use App\Models\MedicalAssistanceType;
 use App\Models\MedicalInstitution;
+use App\Models\MedicalServices;
+use App\Models\PlannedIndicator;
 use App\Services\DataForContractService;
+use App\Services\NodeService;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
@@ -16,6 +25,7 @@ class MeetingMinutesReportService
 {
     public function __construct(
         private DataForContractService $dataForContractService,
+        private NodeService $nodeService
     ){ }
 
     public function generate(string $templateFullFilepath, int $year, int $commissionDecisionsId) : Spreadsheet {
@@ -475,6 +485,180 @@ class MeetingMinutesReportService
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
 
+        // Поликлиника по тарифу
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial');
+        $spreadsheet->getDefaultStyle()->getFont()->setSize(12);
+
+        $typeFinId = IndicatorType::where('name', 'money')->first()->id;
+        $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+
+        $polyclinicTariffCategory = CategoryTreeNodes::Where('slug', 'polyclinic-tariff')->first();
+        $polyclinicTariffAllNodeIds = $this->nodeService->allChildrenNodeIds($polyclinicTariffCategory->id);
+        foreach($polyclinicTariffAllNodeIds as $nodeId) {
+            $node = CategoryTreeNodes::find($nodeId);
+            $category = Category::find($node->category_id);
+
+            $medicalAssistanceTypeIds = $this->nodeService->medicalAssistanceTypesForNodeId($nodeId);
+            $medicalServiceIds = $this->nodeService->medicalServicesForNodeId($nodeId);
+            $plannedIndicatorsForNodeId = PlannedIndicator::find($this->nodeService->plannedIndicatorsForNodeId($nodeId));
+            $allIndicators = Indicator::all();
+
+            $arr['assistanceTypes'] = MedicalAssistanceType::find($medicalAssistanceTypeIds);
+            $arr['services'] = MedicalServices::find($medicalServiceIds);
+
+            // Данные таблицы
+            $dataRow = 0;
+            $arrayData = [];
+            $tableHasData = false;
+            foreach($moCollection as $mo) {
+                $rowHasData = false;
+                $dataCol = 0;
+                $arrayData[$dataRow] = [];
+                $arrayData[$dataRow][++$dataCol] = $dataRow + 1;
+                $arrayData[$dataRow][++$dataCol] = $mo->code;
+                $arrayData[$dataRow][++$dataCol] = $mo->short_name;
+                foreach($arr as $key => $colunms) {
+                    $perUnit = $content['mo'][$mo->id]['polyclinic']['perUnit']['all'][$key] ?? null;
+                    if (!$perUnit) { continue; }
+                    foreach($colunms as $medicalAssistanceTypeOrService) {
+                        $indicatorIds = $plannedIndicatorsForNodeId->filter(function ($value) use ($medicalAssistanceTypeOrService, $key) {
+                            if ($key == 'assistanceTypes') {
+                                return $value->assistance_type_id === $medicalAssistanceTypeOrService->id;
+                            } else if ($key == 'services') {
+                                return $value->service_id === $medicalAssistanceTypeOrService->id;
+                            }
+
+                        })->unique('indicator_id')->pluck('indicator_id');
+                        $indicators = $allIndicators->find($indicatorIds);
+                        $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
+                        $finIndicator = $indicators->firstWhere('type_id', $typeFinId);
+
+                        $quantVal = $perUnit[$medicalAssistanceTypeOrService->id][$quantIndicator->id] ?? '0';
+                        $finVal = $perUnit[$medicalAssistanceTypeOrService->id][$finIndicator->id] ?? '0';
+
+                        $arrayData[$dataRow][++$dataCol] = $quantVal;
+                        $arrayData[$dataRow][++$dataCol] = $finVal;
+                        if(!$rowHasData) {
+                            if (bccomp($quantVal,'0') !== 0 || bccomp($finVal,'0')) {
+                                $tableHasData = true;
+                                $rowHasData = true;
+                            }
+                        }
+                    }
+                }
+                if(!$rowHasData) {
+                    unset($arrayData[$dataRow]);
+                } else {
+                    $dataRow++;
+                }
+            }
+            if ($tableHasData) {
+                $sheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, mb_substr('АП(тариф)' . \Illuminate\Support\Str::ucfirst($category->name), 0, 31));
+                $spreadsheet->addSheet($sheet, 0);
+                $curRow = 0;
+                $curCol = 1;
+                $sheet->setCellValue([$curCol,++$curRow], 'Корректировка объемов и финансового обеспечения медицинской помощи');
+                $sheet->getRowDimension($curRow)->setRowHeight(20);
+                $sheet->setCellValue([1,++$curRow], 'Медицинская помощь в амбулаторных условиях, оплата по тарифу, ' . $category->name);
+                $sheet->getRowDimension($curRow)->setRowHeight(20);
+                $sheet->setCellValue([1,++$curRow], $docName);
+                $sheet->getRowDimension($curRow)->setRowHeight(20);
+
+                $minimumVolumeDataCellWidth = 8;
+                $minimumMoneyDataCellWidth = 15;
+
+                $curRow = 4;
+                $curCol = 1;
+                $step = 2;
+                $tableStartCol = $curCol;
+                $tableEndCol = $curCol;
+                $tableHeadStartRow = $curRow;
+                $tableHeadEndRow = $curRow;
+                $staticTableHeadStartCol = $curCol;
+                // Статическая часть заголовка таблицы
+                $sheet->setCellValue([$curCol, $curRow], '№ п/п');
+                $strwidth = mb_strwidth (' № п/п ');
+                $sheet->getColumnDimensionByColumn($curCol)->setWidth($strwidth);
+                $sheet->setCellValue([++$curCol, $curRow], 'Код МО');
+                $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+                $sheet->setCellValue([++$curCol, $curRow], 'Медицинская организация');
+                $sheet->getColumnDimensionByColumn($curCol)->setWidth(50);
+                $staticTableHeadEndCol = $curCol;
+                $sheet->setCellValue([++$curCol, $curRow], 'корректировка');
+
+                $curRow++;
+                // Динамическая часть заголовка таблицы
+                foreach($arr as $key => $colunms) {
+                    foreach($colunms as $t) {
+                        $sheet->setCellValue([$curCol, $curRow], $t->name);
+                        $sheet->mergeCells([$curCol, $curRow, $curCol + $step - 1, $curRow]);
+                        $halfWidth = round(mb_strwidth ($t->name) / 2) + 2;
+
+                        $indicatorIds = $plannedIndicatorsForNodeId->filter(function ($value) use ($t, $key) {
+                            if ($key == 'assistanceTypes') {
+                                return $value->assistance_type_id === $t->id;
+                            } else if ($key == 'services') {
+                                return $value->service_id === $t->id;
+                            }
+
+                        })->unique('indicator_id')->pluck('indicator_id');
+                        $indicators = $allIndicators->find($indicatorIds);
+                        $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
+                        // $finIndicator = $indicators->firstWhere('type_id', $typeFinId);
+
+                        $sheet->getColumnDimensionByColumn($curCol)->setWidth(max(mb_strwidth($quantIndicator->name)+2, $halfWidth, $minimumVolumeDataCellWidth));
+                        $sheet->getColumnDimensionByColumn($curCol + 1)->setWidth(max($halfWidth, $minimumMoneyDataCellWidth));
+                        $sheet->setCellValue([$curCol, $curRow + 1], 'объемы, ' . $quantIndicator->name);
+                        $sheet->getRowDimension($curRow + 1)->setRowHeight(50);
+                        $sheet->setCellValue([$curCol + 1, $curRow + 1], 'финансовое обеспечение, руб.');
+                        $sheet->getStyle([$curCol, $curRow + 1, $curCol + 1, $curRow + 1])->getAlignment()->setWrapText(true);
+
+                        $tableEndCol = $curCol + $step - 1;
+                        $curCol += $step;
+                    }
+                }
+                $tableHeadEndRow = ++$curRow;
+                $curRow++;
+                $tableBodyStartRow = $curRow;
+
+                $totalRow = $tableBodyStartRow + count($arrayData);
+                $tableBodyEndRow = $totalRow - 1;
+                $tableEndRow = $totalRow;
+                // Вставляем данные из массива в таблицу
+                $sheet->fromArray($arrayData, null, Coordinate::stringFromColumnIndex($tableStartCol) . $tableBodyStartRow);
+
+                // Строка итогов
+                $sheet->setCellValue([$staticTableHeadStartCol, $totalRow], 'Итого');
+                for ($c = $staticTableHeadEndCol + 1; $c <= $tableEndCol; $c++) {
+                    $colStringName = Coordinate::stringFromColumnIndex($c);
+                    $sheet->setCellValue([$c, $totalRow],'=sum(' . $colStringName . $tableBodyStartRow . ':' . $colStringName . $tableBodyEndRow . ')');
+                }
+                // Объдинение ячейк и выравнивание такста заголовка и итога
+                for($ci = $staticTableHeadStartCol; $ci <= $staticTableHeadEndCol; $ci++) {
+                    $sheet->mergeCells([$ci, $tableHeadStartRow, $ci, $tableHeadEndRow]);
+                }
+                $sheet->mergeCells([$staticTableHeadEndCol + 1, $tableHeadStartRow, $tableEndCol, $tableHeadStartRow]);
+                $sheet->mergeCells([$staticTableHeadStartCol, $totalRow, $staticTableHeadEndCol, $totalRow]);
+                $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableHeadEndRow])
+                    ->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+                    ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+                $sheet->getStyle([$tableStartCol, $totalRow, $tableStartCol, $totalRow])
+                    ->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                    ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+                $sheet->getStyle([$tableStartCol, $totalRow, $tableStartCol, $totalRow])->getFont()->setBold(true);
+                // Border таблицы
+                $styleArray = [
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                        ],
+                    ],
+                ];
+                $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableEndRow])->applyFromArray($styleArray);
+            }
+        }
 
         $sheet = $spreadsheet->getSheetByName('АП (по тарифу)');
 

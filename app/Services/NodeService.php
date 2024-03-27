@@ -118,6 +118,35 @@ class NodeService
 
     }
 
+    private function allChildrenNodes(int $nodeId)
+    {
+        /*
+        $res = DB::select("with RECURSIVE cte as
+            (
+                select tct.id, tct.parent_id from tbl_category_tree tct where tct.parent_id = ?
+                union all
+                select tct.id, tct.parent_id from tbl_category_tree tct
+                inner join cte as c on c.id = tct.parent_id
+            )
+            select id from cte;",
+            [$nodeId]
+            );
+        */
+        $query = CategoryTreeNodes::select('id', 'parent_id')->join('cte', 'parent_id', '=', 'cte.node_id');
+        $nodes = CategoryTreeNodes::select('id', 'parent_id')->where('parent_id', '=', $nodeId)->unionAll($query);
+        $res = DB::select("WITH recursive cte (node_id, node_parent_id) AS ({$nodes->toSql()}) select node_id as id, node_parent_id as parent_id from cte order by node_id;",[$nodeId]);
+        return $res;
+
+    }
+
+    public function allChildrenNodeIds(int $nodeId): array
+    {
+        $res = $this->allChildrenNodes($nodeId);
+
+        $ids = array_column($res, 'id');
+        return $ids;
+    }
+
     public function nodeWithChildrenIds(int $nodeId): array
     {
         $res = $this->nodeWithChildren($nodeId);
