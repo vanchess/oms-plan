@@ -485,7 +485,9 @@ class MeetingMinutesReportService
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
 
+        ////////////////////////
         // Поликлиника по тарифу
+        ////////////////////////
         $spreadsheet->getDefaultStyle()->getFont()->setName('Arial');
         $spreadsheet->getDefaultStyle()->getFont()->setSize(12);
 
@@ -633,7 +635,7 @@ class MeetingMinutesReportService
                     $colStringName = Coordinate::stringFromColumnIndex($c);
                     $sheet->setCellValue([$c, $totalRow],'=sum(' . $colStringName . $tableBodyStartRow . ':' . $colStringName . $tableBodyEndRow . ')');
                 }
-                // Объдинение ячейк и выравнивание такста заголовка и итога
+                // Объдинение ячеек и выравнивание такста заголовка и итога
                 for($ci = $staticTableHeadStartCol; $ci <= $staticTableHeadEndCol; $ci++) {
                     $sheet->mergeCells([$ci, $tableHeadStartRow, $ci, $tableHeadEndRow]);
                 }
