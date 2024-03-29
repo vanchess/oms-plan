@@ -795,15 +795,24 @@ class SummaryVolumeReportService {
             ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
 
         /// End Диспансеризация
+        ++$sheetIndex;
+        //////////////////////////////
+        // Профилактические осмотры
+        //////////////////////////////
+        $tableEndCol = 8 + 12;
+        $sheetSubsectionNumber++;
+        $sheet = clone $spreadsheet->getSheetByName('3.2 Профилактические осмотры');
 
-        $sheet = $spreadsheet->getSheetByName('3.2 Профилактические осмотры');
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, диспансеризация");
+        $sheetName = 'ПО взр.';
+        $sheet->setTitle(mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+        $spreadsheet->addSheet($sheet, ++$sheetIndex);
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, профилактические медицинские осмотры взрослого населения");
         $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
         $ordinalRowNum = 0;
         $rowIndex = $startRow - 1;
         $category = 'polyclinic';
         $indicatorId = 9; // посещений
-        $assistanceTypeIds = [17, 18]; //	взрослые, несовершеннолетние
+        $assistanceTypeIds = [17]; // взрослые
         foreach($moCollection as $mo) {
             $ordinalRowNum++;
             $rowIndex++;
@@ -843,6 +852,133 @@ class SummaryVolumeReportService {
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
         $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        // Заголовок листа
+        $curRow = 0;
+        $curCol = 1;
+
+        $sheet->setCellValue([$tableEndCol,++$curRow], "Таблица $sheetSectionNumber.$sheetSubsectionNumber");
+        $sheet->getStyle([$tableEndCol, $curRow, $tableEndCol, $curRow])
+            ->getAlignment()
+            ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+            ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+
+
+        $sheetSubsectionNumber++;
+        $sheet = $spreadsheet->getSheetByName('3.2 Профилактические осмотры');
+        $sheetName = 'ПО дети';
+        $sheet->setTitle(mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, профилактические медицинские осмотры несовершеннолетних");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [18]; // несовершеннолетние
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([8,$rowIndex], $v);
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $v = 0;
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $fap = 0;
+                    foreach ($faps as $f) {
+                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    }
+                    $v += ($perPerson + $perUnit + $fap);
+                }
+                $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        // Заголовок листа
+        $curRow = 0;
+        $curCol = 1;
+
+        $sheet->setCellValue([$tableEndCol,++$curRow], "Таблица $sheetSectionNumber.$sheetSubsectionNumber");
+        $sheet->getStyle([$tableEndCol, $curRow, $tableEndCol, $curRow])
+            ->getAlignment()
+            ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+            ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+
+        // END Профилактические осмотры
+
+        //////////////////////////////
+        // школа сахарного диабета
+        //////////////////////////////
+        $sheet = $spreadsheet->getSheetByName('3.9 Школа С.Д.');
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, школа сахарного диабета");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [19]; // школы для пациентов c сахарным диабетом
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([8,$rowIndex], $v);
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $v = 0;
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $fap = 0;
+                    foreach ($faps as $f) {
+                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    }
+                    $v += ($perPerson + $perUnit + $fap);
+                }
+                $sheet->setCellValue([8 + 3 + $monthNum, $rowIndex],  $v);
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+
+
+
+        //
 
         $sheet = $spreadsheet->getSheetByName('4 Неотложная помощь');
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, неотложная помощь");
