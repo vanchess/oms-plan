@@ -70,18 +70,28 @@ class SummaryCostReportService
             $servicesPerPersonSum = PlanCalculatorService::polyclinicPerPersonServicesSum($content, $mo->id, $indicatorId);
             $perPersonSum = bcadd($assistanceTypesPerPersonSum, $servicesPerPersonSum);
 
-            $perUnitAssistanceTypesSum = PlanCalculatorService::polyclinicPerUnitAssistanceTypesSum($content, $mo->id, $indicatorId);
+            // $perUnitAssistanceTypesSum = PlanCalculatorService::polyclinicPerUnitAssistanceTypesSum($content, $mo->id, $indicatorId);
             $perUnitServicesSum = PlanCalculatorService::polyclinicPerUnitServicesSum($content, $mo->id, $indicatorId);
 
             $fapSum = bcadd(
                 PlanCalculatorService::polyclinicFapServicesSum($content, $mo->id, $indicatorId),
                 PlanCalculatorService::polyclinicFapAssistanceTypesSum($content, $mo->id, $indicatorId)
             );
-
-            $sheet->setCellValue([9,$rowIndex], $perPersonSum);
-            $sheet->setCellValue([10,$rowIndex], $fapSum);
-            $sheet->setCellValue([11,$rowIndex], $perUnitServicesSum);
-            $sheet->setCellValue([12,$rowIndex], $perUnitAssistanceTypesSum);
+            $curCol = 8;
+            $sheet->setCellValue([++$curCol, $rowIndex], $perPersonSum);
+            $sheet->setCellValue([++$curCol, $rowIndex], $fapSum);
+            $sheet->setCellValue([++$curCol, $rowIndex], $perUnitServicesSum);
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [1,2,3,4])); // посещения профилактические, посещения разовые по заболеваниям, посещения неотложные, обращения по заболеваниям
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [9,10,11,12])); // Диспансерное наблюдение
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [13])); // Диспансеризация взрослого населения
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [14])); // Углубленная диспансеризация
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [20,21])); // Диспансеризация для оценки репродуктивного здоровья
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [15])); // Диспансеризация сирот
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [16])); // Диспансеризация опекаемых
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [17])); // Профосмотры взрослых
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [18])); // Профосмотры несовершеннолетних
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [19])); // Школа сахарного диабета
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [8])); // Медицинская реабилитация
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
@@ -103,11 +113,11 @@ class SummaryCostReportService
 
                 $v = bcadd($perPersonSum, bcadd($perUnitSum, $fapSum));
 
-                $sheet->setCellValue([12 + $monthNum, $rowIndex], $v);
+                $sheet->setCellValue([$curCol + $monthNum, $rowIndex], $v);
             }
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 24, $startRow, $rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, $curCol + 12, $startRow, $rowIndex);
     }
 
     public function generate(string $templateFullFilepath, int $year, int $commissionDecisionsId = null) : Spreadsheet

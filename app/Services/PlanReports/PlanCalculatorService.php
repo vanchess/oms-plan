@@ -7,13 +7,19 @@ use App\Enum\RehabilitationBedOptionEnum;
 use App\Services\RehabilitationProfileService;
 
 class PlanCalculatorService {
-    // Фин обеспечение по подушевому нормативу финансирования на прикрепившихся лиц
-    public static function polyclinicSum($content, int $moId, int $indicatorId, string $category, string $methodOfFinancing, string $polyclinicSubType ) : string
+    // Фин обеспечение
+    public static function polyclinicSum($content, int $moId, int $indicatorId, string $category, string $methodOfFinancing, string $polyclinicSubType, array $onlyIds = null ) : string
     {
         $sum = '0';
         $assistanceTypesPerPerson = $content['mo'][$moId][$category][$methodOfFinancing]['all'][$polyclinicSubType] ?? [];
-        foreach ($assistanceTypesPerPerson as $assistanceType) {
-            $sum = bcadd($sum, $assistanceType[$indicatorId] ?? '0');
+        if ($onlyIds === null) {
+            foreach ($assistanceTypesPerPerson as $assistanceType) {
+                $sum = bcadd($sum, $assistanceType[$indicatorId] ?? '0');
+            }
+        } else {
+            foreach ($onlyIds as $id) {
+                $sum = bcadd($sum, $assistanceTypesPerPerson[$id][$indicatorId] ?? '0');
+            }
         }
         return $sum;
     }
@@ -32,6 +38,11 @@ class PlanCalculatorService {
     public static function polyclinicPerUnitAssistanceTypesSum($content, int $moId, int $indicatorId) : string
     {
         return static::polyclinicSum($content, $moId, $indicatorId, 'polyclinic', 'perUnit', 'assistanceTypes');
+    }
+    // Фин обеспечение МП в амбулаторных условиях за единицу объема медицинской помощи (только указанные ИД из medical_assistance_types)
+    public static function polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, int $moId, int $indicatorId, array $onlyIds) : string
+    {
+        return static::polyclinicSum($content, $moId, $indicatorId, 'polyclinic', 'perUnit', 'assistanceTypes', $onlyIds);
     }
     // Фин обеспечение МП в амбулаторных условиях за единицу объема медицинской помощи (услуги)
     public static function polyclinicPerUnitServicesSum($content, int $moId, int $indicatorId) : string
