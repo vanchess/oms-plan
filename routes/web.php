@@ -3968,7 +3968,8 @@ function getLevel(int $year, int $monthNum, int $ts, int $moId, int $bedProfileI
 
 function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup)
 {
-    if ($moCode === '450004' && ($vmpGroup === 23 || $vmpGroup === 24)) {
+    // КООД
+    if ($moCode === '450004' && ($vmpGroup === 23 || $vmpGroup === 24 || $vmpGroup === 25 || $vmpGroup === 26)) {
         return 36; // Радиологические (V020 код: 64);
     }
     // пропускаем профили:
