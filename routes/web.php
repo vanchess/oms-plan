@@ -3647,7 +3647,7 @@ Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecision
                     if (!$vmpGroupsData) { continue; }
 
                     foreach ($vmpGroupsData as $vmpGroup => $vmpTypes) {
-                        $hbpId = vmpGetBedProfileId($cpId, $mo->code, $vmpGroup);
+                        $hbpId = vmpGetBedProfileId($cpId, $mo->code, $vmpGroup, $year);
 
                         foreach ($vmpTypes as $vmpT)
                         {
@@ -3966,11 +3966,25 @@ function getLevel(int $year, int $monthNum, int $ts, int $moId, int $bedProfileI
     return $lResult;
 }
 
-function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup)
+function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup, int $year)
 {
     // КООД
-    if ($moCode === '450004' && ($vmpGroup === 23 || $vmpGroup === 24 || $vmpGroup === 25 || $vmpGroup === 26)) {
-        return 36; // Радиологические (V020 код: 64);
+    if ($moCode === '450004') {
+        if ($year < 2024) {
+            if ($vmpGroup === 23 || $vmpGroup === 24) {
+                return 36; // Радиологические (V020 код: 64);
+            }
+        }
+        if ($year === 2024) {
+            if ($vmpGroup === 23 || $vmpGroup === 24 || $vmpGroup === 25 || $vmpGroup === 26) {
+                return 36; // Радиологические (V020 код: 64);
+            }
+        }
+        if ($year > 2024) {
+            if ($vmpGroup === 23 || $vmpGroup === 24 || $vmpGroup === 25 || $vmpGroup === 26 || $vmpGroup === 27) {
+                return 36; // Радиологические (V020 код: 64);
+            }
+        }
     }
     // пропускаем профили:
     //  19 - Кардиохирургические
@@ -4148,7 +4162,7 @@ Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?
 
                     $ts = getTs($daytimeOrRoundClock, $hospitalSubType);
                     foreach ($vmpGroupsData as $vmpGroup => $vmpTypes) {
-                        $hbpId = vmpGetBedProfileId($cpId, $mo->code, $vmpGroup);
+                        $hbpId = vmpGetBedProfileId($cpId, $mo->code, $vmpGroup, $year);
                         $oplat = getOplat($daytimeOrRoundClock, $hospitalSubType, $hbpId);
 
                         foreach ($vmpTypes as $vmpT)
