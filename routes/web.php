@@ -3981,7 +3981,7 @@ function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup, i
             }
         }
         if ($year > 2024) {
-            if ($vmpGroup === 23 || $vmpGroup === 24 || $vmpGroup === 25 || $vmpGroup === 26 || $vmpGroup === 27) {
+            if ($vmpGroup === 25 || $vmpGroup === 26 || $vmpGroup === 27) {
                 return 36; // Радиологические (V020 код: 64);
             }
         }
