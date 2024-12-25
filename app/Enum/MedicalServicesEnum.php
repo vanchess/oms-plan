@@ -25,7 +25,7 @@ class MedicalServicesEnum {
          */
         public const PathologicalAnatomicalBiopsyMaterial = 5;
         /**
-         * Малекулярно-генетические исследования с целью выявления онкологических заболеваний
+         * Молекулярно-генетические исследования с целью выявления онкологических заболеваний
          */
         public const MolecularGeneticDetectionOncological = 6;
         /**

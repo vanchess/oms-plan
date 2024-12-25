@@ -14,10 +14,12 @@ use App\Models\Indicator;
 use App\Models\IndicatorType;
 use App\Models\MedicalAssistanceType;
 use App\Models\MedicalInstitution;
+use App\Models\MedicalServices;
 use App\Models\VmpGroup;
 use App\Models\VmpTypes;
 use App\Services\DataForContractService;
 use App\Services\InitialDataFixingService;
+use App\Services\MedicalServicesService;
 use App\Services\NodeService;
 use App\Services\PeopleAssignedInfoForContractService;
 use App\Services\PlannedIndicatorChangeInitService;
@@ -50,7 +52,8 @@ class SummaryVolumeReportService {
         private PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService,
         private InitialDataFixingService $initialDataFixingService,
         private PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService,
-        private NodeService $nodeService)
+        private NodeService $nodeService,
+        private MedicalServicesService $medicalServicesService)
     { }
 
     private function fillPolyclinicSheet(Worksheet $sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, int $startRow, int $serviceId, int $indicatorId, string $category = 'polyclinic', $endRow = 100) {
@@ -115,6 +118,128 @@ class SummaryVolumeReportService {
 
         $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
         $spreadsheet = $reader->load($templateFullFilepath);
+
+
+        $endRow = 100;
+        $startRow = 7;
+
+        $sheet = $spreadsheet->getSheetByName('1.Скорая помощь');
+        $sheet->setCellValue([21, 2], $docName);
+        $sheet->setCellValue([1, 3], "Скорая помощь, плановые объемы на $year год");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'ambulance';
+        $indicatorId = 5; // вызовов
+        $callsAssistanceTypeId = 5; // вызовы
+        $thrombolysisAssistanceTypeId = 6;// тромболизис
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['peopleAssigned'] ?? 0);
+            $thrombolysis = $content['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
+            $sheet->setCellValue([8,$rowIndex], ($content['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? 0) + $thrombolysis);
+            $sheet->setCellValue([9,$rowIndex], $thrombolysis);
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $thrombolysis = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
+                $sheet->setCellValue([9 + $monthNum, $rowIndex],  ($contentByMonth[$monthNum]['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? 0) + $thrombolysis);
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 21, $startRow, $rowIndex);
+
+
+        $sheet = $spreadsheet->getSheetByName('2.обращения по заболеваниям');
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 8; // обращений
+        $assistanceTypeId = 4; //обращения по заболеваниям
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
+            $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+            $fap = 0;
+            foreach ($faps as $f) {
+                $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+            }
+
+            $sheet->setCellValue([8,$rowIndex], $perPerson + $perUnit + $fap );
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $sheet->setCellValue([8 + $monthNum, $rowIndex],  ($perPerson + $perUnit + $fap));
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+
+        $sheet = $spreadsheet->getSheetByName('2.1 Мед. реабилитация амб.усл.');
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год (медицинская реабилитация)");
+        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [8]; //	медицинская реабилитация
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([8,$rowIndex], $v);
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $v = 0;
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $fap = 0;
+                    foreach ($faps as $f) {
+                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    }
+                    $v += ($perPerson + $perUnit + $fap);
+                }
+                $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
+            }
+        }
+        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
 
         ///////////////////////////////
         // 2.2 Диспансерное наблюдение (АП, по тарифу)
@@ -309,130 +434,49 @@ class SummaryVolumeReportService {
             $sheet->getStyle([$titleCol, $titleRow, $titleCol, $titleRow])->getFont()->setBold(true);
             $sheet->getRowDimension($titleRow)->setRowHeight(20);
             $sheet->freezePane([$staticTableHeadEndCol + 1, $tableBodyStartRow]);
+
+            $sheetSubsectionNumber++;
         }
 
         // END 2.2 Диспансерное наблюдение
 
-        $endRow = 100;
+        //////////////////////////////
+        // Диагностические услуги
+        //////////////////////////////
+        $servicesIndicatorId = 6; // услуг
+        $templateSheetName = '_ДиагностическиеУслуги';
+        /// список диагностических услуг актуальных на текущий год
+        $medicalServiceIds = $this->medicalServicesService->getIdsByYear($year);
+        $medicalServices = MedicalServices::whereIn('id', $medicalServiceIds)->orderBy('order')->get();
 
-        $sheet = $spreadsheet->getSheetByName('1.Скорая помощь');
-        $sheet->setCellValue([21, 2], $docName);
-        $sheet->setCellValue([1, 3], "Скорая помощь, плановые объемы на $year год");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $ordinalRowNum = 0;
-        $startRow = 7;
-        $rowIndex = $startRow - 1;
-        $category = 'ambulance';
-        $indicatorId = 5; // вызовов
-        $callsAssistanceTypeId = 5; // вызовы
-        $thrombolysisAssistanceTypeId = 6;// тромболизис
-        foreach($moCollection as $mo) {
-            $ordinalRowNum++;
-            $rowIndex++;
-            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
-            // $sheet->setCellValue([1,$rowIndex], $mo->code);
-            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
-            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['peopleAssigned'] ?? 0);
-            $thrombolysis = $content['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
-            $sheet->setCellValue([8,$rowIndex], ($content['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? 0) + $thrombolysis);
-            $sheet->setCellValue([9,$rowIndex], $thrombolysis);
-            for($monthNum = 1; $monthNum <= 12; $monthNum++)
-            {
-                $thrombolysis = $contentByMonth[$monthNum]['mo'][$mo->id][$category][$thrombolysisAssistanceTypeId][$indicatorId] ?? 0;
-                $sheet->setCellValue([9 + $monthNum, $rowIndex],  ($contentByMonth[$monthNum]['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? 0) + $thrombolysis);
-            }
+        // $sheetSectionNumber = 2;
+        // $sheetSubsectionNumber = 2;
+
+        foreach ($medicalServices as $ms) {
+            $sheet = clone $spreadsheet->getSheetByName($templateSheetName);
+            $sheetName = $ms->short_name ?? $ms->name;
+            $curRow = 0;
+            $tableEndCol = 20;
+
+            $sheet->setCellValue([$tableEndCol,++$curRow], "Таблица $sheetSectionNumber.$sheetSubsectionNumber");
+            $sheetTitle = str_replace(['/', '\\', '?', '*'], '_', mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+            $sheet->setTitle($sheetTitle);
+            $spreadsheet->addSheet($sheet, ++$sheetIndex);
+
+            $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год ($ms->name)");
+            $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+
+            $serviceId = $ms->id;
+            $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
+
+            $sheetSubsectionNumber++;
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 21, $startRow, $rowIndex);
 
-
-        $sheet = $spreadsheet->getSheetByName('2.обращения по заболеваниям');
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $ordinalRowNum = 0;
-        $rowIndex = $startRow - 1;
-        $category = 'polyclinic';
-        $indicatorId = 8; // обращений
-        $assistanceTypeId = 4; //обращения по заболеваниям
-        foreach($moCollection as $mo) {
-            $ordinalRowNum++;
-            $rowIndex++;
-            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
-            // $sheet->setCellValue([1,$rowIndex], $mo->code);
-            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
-            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
-            $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-            $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-            $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
-            $fap = 0;
-            foreach ($faps as $f) {
-                $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-            }
-
-            $sheet->setCellValue([8,$rowIndex], $perPerson + $perUnit + $fap );
-
-            for($monthNum = 1; $monthNum <= 12; $monthNum++)
-            {
-                $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
-                $fap = 0;
-                foreach ($faps as $f) {
-                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                }
-                $sheet->setCellValue([8 + $monthNum, $rowIndex],  ($perPerson + $perUnit + $fap));
-            }
-        }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
-
-        $sheet = $spreadsheet->getSheetByName('2.1 Мед. реабилитация амб.усл.');
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год (медицинская реабилитация)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $ordinalRowNum = 0;
-        $rowIndex = $startRow - 1;
-        $category = 'polyclinic';
-        $indicatorId = 9; // посещений
-        $assistanceTypeIds = [8]; //	медицинская реабилитация
-        foreach($moCollection as $mo) {
-            $ordinalRowNum++;
-            $rowIndex++;
-            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
-            // $sheet->setCellValue([1,$rowIndex], $mo->code);
-            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
-            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
-            $v = 0;
-            foreach($assistanceTypeIds as $assistanceTypeId) {
-                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
-                $fap = 0;
-                foreach ($faps as $f) {
-                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                }
-                $v += ($perPerson + $perUnit + $fap);
-            }
-
-            $sheet->setCellValue([8,$rowIndex], $v);
-
-            for($monthNum = 1; $monthNum <= 12; $monthNum++)
-            {
-                $v = 0;
-                foreach($assistanceTypeIds as $assistanceTypeId) {
-                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
-                    $fap = 0;
-                    foreach ($faps as $f) {
-                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                    }
-                    $v += ($perPerson + $perUnit + $fap);
-                }
-                $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
-            }
-        }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        // Удаляем лист шаблон
+        $templateSheetIndex = $spreadsheet->getIndex(
+            $spreadsheet->getSheetByName($templateSheetName)
+        );
+        $spreadsheet->removeSheetByIndex($templateSheetIndex);
 
 
         $sheet = $spreadsheet->getSheetByName('3.Посещения с иными целями');
@@ -483,13 +527,16 @@ class SummaryVolumeReportService {
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
         $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
 
+        $sheetIndex++;
+
         /////////////////////
         // Диспансеризация
         /////////////////////
         $sheetSectionNumber = 3;
         $sheetSubsectionNumber = 2;
-        $sheetIndex = 12;
-        $tableEndCol = 7 + 12;
+        // $sheetIndex = 12;
+        $tableDataStartCol = 7;
+        $tableEndCol = $tableDataStartCol + 12;
         $sheet = clone $spreadsheet->getSheetByName('3.1 Диспансеризация');
 
         $sheetName = 'Дисп.в.н.';
@@ -519,7 +566,7 @@ class SummaryVolumeReportService {
                 $v += ($perPerson + $perUnit + $fap);
             }
 
-            $sheet->setCellValue([7,$rowIndex], $v);
+            $sheet->setCellValue([$tableDataStartCol, $rowIndex], $v);
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
@@ -534,11 +581,11 @@ class SummaryVolumeReportService {
                     }
                     $v += ($perPerson + $perUnit + $fap);
                 }
-                $sheet->setCellValue([7 + $monthNum, $rowIndex],  $v);
+                $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -581,7 +628,7 @@ class SummaryVolumeReportService {
                 $v += ($perPerson + $perUnit + $fap);
             }
 
-            $sheet->setCellValue([7,$rowIndex], $v);
+            $sheet->setCellValue([$tableDataStartCol,$rowIndex], $v);
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
@@ -596,11 +643,11 @@ class SummaryVolumeReportService {
                     }
                     $v += ($perPerson + $perUnit + $fap);
                 }
-                $sheet->setCellValue([7 + $monthNum, $rowIndex],  $v);
+                $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -642,7 +689,7 @@ class SummaryVolumeReportService {
                 $v += ($perPerson + $perUnit + $fap);
             }
 
-            $sheet->setCellValue([7,$rowIndex], $v);
+            $sheet->setCellValue([$tableDataStartCol, $rowIndex], $v);
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
@@ -657,11 +704,11 @@ class SummaryVolumeReportService {
                     }
                     $v += ($perPerson + $perUnit + $fap);
                 }
-                $sheet->setCellValue([7 + $monthNum, $rowIndex],  $v);
+                $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
 
         // Заголовок листа
         $curRow = 0;
@@ -704,7 +751,7 @@ class SummaryVolumeReportService {
                 $v += ($perPerson + $perUnit + $fap);
             }
 
-            $sheet->setCellValue([7,$rowIndex], $v);
+            $sheet->setCellValue([$tableDataStartCol, $rowIndex], $v);
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
@@ -719,11 +766,11 @@ class SummaryVolumeReportService {
                     }
                     $v += ($perPerson + $perUnit + $fap);
                 }
-                $sheet->setCellValue([7 + $monthNum, $rowIndex],  $v);
+                $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -764,7 +811,7 @@ class SummaryVolumeReportService {
                 $v += ($perPerson + $perUnit + $fap);
             }
 
-            $sheet->setCellValue([7,$rowIndex], $v);
+            $sheet->setCellValue([$tableDataStartCol,$rowIndex], $v);
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
@@ -779,11 +826,11 @@ class SummaryVolumeReportService {
                     }
                     $v += ($perPerson + $perUnit + $fap);
                 }
-                $sheet->setCellValue([7 + $monthNum, $rowIndex],  $v);
+                $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -796,6 +843,8 @@ class SummaryVolumeReportService {
 
         /// End Диспансеризация
         ++$sheetIndex;
+
+
         //////////////////////////////
         // Профилактические осмотры
         //////////////////////////////
@@ -928,54 +977,260 @@ class SummaryVolumeReportService {
         //////////////////////////////
         // школа сахарного диабета
         //////////////////////////////
-        $sheet = $spreadsheet->getSheetByName('3.9 Школа С.Д.');
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, школа сахарного диабета");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $ordinalRowNum = 0;
-        $rowIndex = $startRow - 1;
-        $category = 'polyclinic';
-        $indicatorId = 9; // посещений
-        $assistanceTypeIds = [19]; // школы для пациентов c сахарным диабетом
-        foreach($moCollection as $mo) {
-            $ordinalRowNum++;
-            $rowIndex++;
-            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
-            // $sheet->setCellValue([1,$rowIndex], $mo->code);
-            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
-            $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
-            $v = 0;
-            foreach($assistanceTypeIds as $assistanceTypeId) {
-                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
-                $fap = 0;
-                foreach ($faps as $f) {
-                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+        if ($year >= 2025) {
+            $sheetSectionNumber = 2;
+            $sheetSubsectionNumber = 2;
+
+            $includingLabel = 'в т.ч.';
+
+            $spreadsheet->getDefaultStyle()->getFont()->setName('Arial');
+            $spreadsheet->getDefaultStyle()->getFont()->setSize(12);
+
+            $sheetIndex = 3;
+
+            $sectionName = 'polyclinic';
+
+            $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+            $polyclinicTariffDispensaryObservationCategory = CategoryTreeNodes::Where('slug', 'polyclinic-tariff-diabetes-schools')->first();
+            $category = Category::find($polyclinicTariffDispensaryObservationCategory->category_id);
+
+            $sheetName = \Illuminate\Support\Str::ucfirst($category->name);
+
+            $dispensaryObservationTypeIds = $this->nodeService->medicalAssistanceTypesForNodeId($polyclinicTariffDispensaryObservationCategory->id);
+            $dispensaryObservationTypes = MedicalAssistanceType::find($dispensaryObservationTypeIds);
+            $indicatorIds = $this->nodeService->indicatorsUsedForNodeId($polyclinicTariffDispensaryObservationCategory->id);
+            $indicators = Indicator::find($indicatorIds);
+
+            $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
+            // Данные таблицы
+            $dataRow = 0;
+            $arrayData = [];
+            $tableHasData = false;
+            foreach($moCollection as $mo) {
+                $rowHasData = false;
+                $dataCol = 0;
+                $arrayData[$dataRow] = [];
+                $arrayData[$dataRow][++$dataCol] = $dataRow + 1;
+                $arrayData[$dataRow][++$dataCol] = $mo->code;
+                $arrayData[$dataRow][++$dataCol] = $mo->short_name;
+                $assistanceTypesPerUnit = $content['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+
+                // if (!$assistanceTypesPerUnit) { continue; }
+                $tableTotalCol = ++$dataCol;
+                foreach($dispensaryObservationTypes as $t) {
+                    $quantVal = $assistanceTypesPerUnit[$t->id][$quantIndicator->id] ?? '0';
+                    $v = $arrayData[$dataRow][$tableTotalCol] ?? '0';
+                    $arrayData[$dataRow][$tableTotalCol] = bcadd($v, $quantVal);
+
+                    if($t->name === 'прочее') {
+                        continue;
+                    }
+
+                    $arrayData[$dataRow][++$dataCol] = $quantVal;
+                    if(!$rowHasData) {
+                        if (bccomp($quantVal,'0') !== 0) {
+                            $tableHasData = true;
+                            $rowHasData = true;
+                        }
+                    }
                 }
-                $v += ($perPerson + $perUnit + $fap);
+                for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                    $assistanceTypesPerUnitByMonth = $contentByMonth[$monthNum]['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+                    $c = $dataCol + $monthNum;
+                    foreach($dispensaryObservationTypes as $t) {
+                        $quantVal = $assistanceTypesPerUnitByMonth[$t->id][$quantIndicator->id] ?? '0';
+                        $v = $arrayData[$dataRow][$c] ?? '0';
+                        $arrayData[$dataRow][$c] = bcadd($v, $quantVal);
+                    }
+                }
+                $dataRow++;
             }
 
-            $sheet->setCellValue([8,$rowIndex], $v);
+            if ($tableHasData) {
+                $sheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+                $spreadsheet->addSheet($sheet, $sheetIndex);
+                $minimumDataCellWidth = 8;
 
-            for($monthNum = 1; $monthNum <= 12; $monthNum++)
-            {
+                $curRow = 4;
+                $curCol = 1;
+                $tableStartCol = $curCol;
+                $tableEndCol = $curCol;
+                $tableHeadStartRow = $curRow;
+                $tableHeadEndRow = $curRow;
+                $staticTableHeadStartCol = $curCol;
+                // Статическая часть заголовка таблицы
+                $sheet->setCellValue([$curCol, $curRow], '№ п/п');
+                $strwidth = mb_strwidth (' № п/п ');
+                $sheet->getColumnDimensionByColumn($curCol)->setWidth($strwidth);
+                $sheet->setCellValue([++$curCol, $curRow], 'Код МО');
+                // $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+                $sheet->setCellValue([++$curCol, $curRow], 'Медицинская организация');
+                $sheet->getColumnDimensionByColumn($curCol)->setWidth(50);
+                $staticTableHeadEndCol = $curCol;
+                $sheet->setCellValue([++$curCol, $curRow], "Всего, $quantIndicator->name");
+                $tableTotalCol = $curCol;
+                $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+                $sheet->setCellValue([++$curCol, $curRow], $includingLabel);
+                $tableIncludingSectionStartCol = $curCol;
+                $tableIncludingSectionEndCol = $curCol;
+
+                $curRow++;
+                // Динамическая часть заголовка таблицы
+                foreach($dispensaryObservationTypes as $t) {
+                    if($t->name === 'прочее') {
+                        continue;
+                    }
+
+                    $sheet->setCellValue([$curCol, $curRow], $t->name);
+                    $width = $minimumDataCellWidth;
+                    $wordArr = explode(' ', $t->name);
+                    foreach ($wordArr as $s) {
+                        $width = max($width, round(mb_strwidth ($s)) + 2);
+                    }
+
+                    $sheet->getColumnDimensionByColumn($curCol)->setWidth($width);
+                    $sheet->getRowDimension($curRow)->setRowHeight(count($wordArr) * 15);
+                    $sheet->mergeCells([$curCol, $curRow, $curCol, $curRow + 1]);
+                    $sheet->getStyle([$curCol, $curRow, $curCol, $curRow])->getAlignment()->setWrapText(true);
+                    $tableIncludingSectionEndCol = $curCol;
+
+                    $curCol++;
+                }
+                $sheet->setCellValue([$curCol, $curRow - 1], 'в том числе поквартально');
+
+                $tablePerMonthSectionStartCol = $curCol;
+                for($qr = 1; $qr <= 4; $qr++) {
+                    $c = $tablePerMonthSectionStartCol + (($qr-1) * 3);
+                    $sheet->setCellValue([$c, $curRow], "$qr квартал");
+                    $sheet->mergeCells([$c, $curRow, $c + 2, $curRow]);
+                }
+                $curRow++;
+                for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                    $sheet->setCellValue([$curCol++, $curRow], $this->months[$monthNum]);
+                }
+                $tablePerMonthSectionEndCol = $curCol - 1;
+                $tableEndCol = $tablePerMonthSectionEndCol;
+
+                $tableHeadEndRow = $curRow;
+                $curRow++;
+                $tableBodyStartRow = $curRow;
+
+                $totalRow = $tableBodyStartRow + count($arrayData);
+                $tableBodyEndRow = $totalRow - 1;
+                $tableEndRow = $totalRow;
+                // Вставляем данные из массива в таблицу
+                $sheet->fromArray($arrayData, null, Coordinate::stringFromColumnIndex($tableStartCol) . $tableBodyStartRow);
+
+                // Строка итогов
+                $sheet->setCellValue([$staticTableHeadStartCol, $totalRow], 'Итого');
+                for ($c = $staticTableHeadEndCol + 1; $c <= $tableEndCol; $c++) {
+                    $colStringName = Coordinate::stringFromColumnIndex($c);
+                    $sheet->setCellValue([$c, $totalRow],'=sum(' . $colStringName . $tableBodyStartRow . ':' . $colStringName . $tableBodyEndRow . ')');
+                }
+                // Объдинение ячеек и выравнивание такста заголовка и итога
+                for($ci = $staticTableHeadStartCol; $ci <= $staticTableHeadEndCol + 1; $ci++) {
+                    $sheet->mergeCells([$ci, $tableHeadStartRow, $ci, $tableHeadEndRow]);
+                }
+
+                $sheet->mergeCells([$tableIncludingSectionStartCol, $tableHeadStartRow, $tableIncludingSectionEndCol, $tableHeadStartRow]);
+                $sheet->mergeCells([$tablePerMonthSectionStartCol, $tableHeadStartRow, $tablePerMonthSectionEndCol, $tableHeadStartRow]);
+                $sheet->mergeCells([$staticTableHeadStartCol, $totalRow, $staticTableHeadEndCol, $totalRow]);
+                $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableHeadEndRow])
+                    ->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+                    ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+                $sheet->getStyle([$tableStartCol, $totalRow, $tableStartCol, $totalRow])
+                    ->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                    ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+                $sheet->getStyle([$tableStartCol, $totalRow, $tableEndCol, $totalRow])->getFont()->setBold(true);
+                // Border таблицы
+                $styleArray = [
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                        ],
+                    ],
+                ];
+                $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableEndRow])->applyFromArray($styleArray);
+
+                // Заголовок листа
+                $curRow = 0;
+                $curCol = 1;
+
+                $sheet->setCellValue([$tableEndCol,++$curRow], "Таблица $sheetSectionNumber.$sheetSubsectionNumber");
+                $sheet->getStyle([$tableEndCol, $curRow, $tableEndCol, $curRow])
+                    ->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                    ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+                ++$curRow;
+                $titleCol = $curCol + 1;
+                $titleRow = $curRow + 1;
+                $sheet->setCellValue([$titleCol, $titleRow], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год ($category->name)");
+                $sheet->getStyle([$titleCol, $titleRow, $titleCol, $titleRow])->getFont()->setBold(true);
+                $sheet->getRowDimension($titleRow)->setRowHeight(20);
+                $sheet->freezePane([$staticTableHeadEndCol + 1, $tableBodyStartRow]);
+
+                $sheetSubsectionNumber++;
+            }
+
+
+            // Удаляем лист шаблон используемый для планов до 2025 года
+            $templateSheetIndex = $spreadsheet->getIndex(
+                $spreadsheet->getSheetByName('3.9 Школа С.Д.')
+            );
+            $spreadsheet->removeSheetByIndex($templateSheetIndex);
+
+        } else {
+            // школа сахарного диабета до 2025 года
+            $sheet = $spreadsheet->getSheetByName('3.9 Школа С.Д.');
+            $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, школа сахарного диабета");
+            $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
+            $ordinalRowNum = 0;
+            $rowIndex = $startRow - 1;
+            $category = 'polyclinic';
+            $indicatorId = 9; // посещений
+            $assistanceTypeIds = [19]; // школы для пациентов c сахарным диабетом
+            foreach($moCollection as $mo) {
+                $ordinalRowNum++;
+                $rowIndex++;
+                $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+                // $sheet->setCellValue([1,$rowIndex], $mo->code);
+                $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+                $sheet->setCellValue([7,$rowIndex], $peopleAssigned[$mo->id][$category]['mo']['peopleAssigned'] ?? 0);
                 $v = 0;
                 foreach($assistanceTypeIds as $assistanceTypeId) {
-                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
-                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
                     $fap = 0;
                     foreach ($faps as $f) {
                         $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
                     }
                     $v += ($perPerson + $perUnit + $fap);
                 }
-                $sheet->setCellValue([8 + 3 + $monthNum, $rowIndex],  $v);
-            }
-        }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
 
+                $sheet->setCellValue([8,$rowIndex], $v);
+
+                for($monthNum = 1; $monthNum <= 12; $monthNum++)
+                {
+                    $v = 0;
+                    foreach($assistanceTypeIds as $assistanceTypeId) {
+                        $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                        $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                        $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                        $fap = 0;
+                        foreach ($faps as $f) {
+                            $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                        }
+                        $v += ($perPerson + $perUnit + $fap);
+                    }
+                    $sheet->setCellValue([8 + 3 + $monthNum, $rowIndex],  $v);
+                }
+            }
+            $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
+            $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        }
 
 
         //
@@ -1028,101 +1283,13 @@ class SummaryVolumeReportService {
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
         $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
 
-        $sheetSectionNumber = 2;
-        $sheetSubsectionNumber = 2;
-        $sheetSubsectionNumber++;
-        $sheetName = "КТ";
-        $servicesIndicatorId = 6; // услуг
-        $sheet = $spreadsheet->getSheetByName('2.2 КТ');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::KT;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (компьютерная томография)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSubsectionNumber++;
-        $sheetName = "МРТ";
-        $sheet = $spreadsheet->getSheetByName('2.3 МРТ');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::MRT;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (магнитно-резонансная томография)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSubsectionNumber++;
-        $sheetName = "УЗИ ССС";
-        $sheet = $spreadsheet->getSheetByName('2.4 УЗИ ССС');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::UltrasoundCardio;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (УЗИ сердечно-сосудистой системы)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSubsectionNumber++;
-        $sheetName = "Эндоскопия";
-        $sheet = $spreadsheet->getSheetByName('2.5 Эндоскопия');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::Endoscopy;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (Эндоскопические исследования)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSubsectionNumber++;
-        $sheetName = "ПАИ";
-        $sheet = $spreadsheet->getSheetByName('2.6 ПАИ');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::PathologicalAnatomicalBiopsyMaterial;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (Паталого анатомическое исследование биопсийного материала с целью диагностики онкологических заболеваний)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSubsectionNumber++;
-        $sheetName = "МГИ";
-        $sheet = $spreadsheet->getSheetByName('2.7 МГИ');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::MolecularGeneticDetectionOncological;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (Малекулярно-генетические исследования с целью диагностики онкологических заболеваний)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSubsectionNumber++;
-        $sheetName = "Тест.covid-19";
-        $sheet = $spreadsheet->getSheetByName('2.8  Тест.covid-19');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::CovidTesting;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в связи с заболеваниями в амбулаторных условиях на $year год (Тестирование на выявление covid-19)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSectionNumber = 3;
-        $sheetSubsectionNumber = 3;
-        $sheetName = "УЗИ плода";
-        $sheet = $spreadsheet->getSheetByName('3.3 УЗИ плода');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::FetalUltrasound;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, УЗИ плода (1 триместр)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSubsectionNumber++;
-        $sheetName = "Компл.иссл. репрод.орг.";
-        $sheet = $spreadsheet->getSheetByName('3.4 Компл.иссл. репрод.орг.');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::DiagnosisBackgroundPrecancerousDiseasesReproductiveWomen;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, комплексное исследование для диагностики фоновых и предраковых заболеваний репродуктивных органов у женщин");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
-
-        $sheetSubsectionNumber++;
-        $sheetName = "Опред.антигена D";
-        $sheet = $spreadsheet->getSheetByName('3.5 Опред.антигена D');
-        $sheet->setTitle("$sheetSectionNumber.$sheetSubsectionNumber $sheetName");
-        $serviceId = MedicalServicesEnum::DeterminationAntigenD;
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, определение антигена D системы Резус (резус-фактор плода)");
-        $sheet->setCellValue([7, 4], "Численность прикрепленного населения на 01.01.$year");
-        $this->fillPolyclinicSheet($sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, $startRow, $serviceId, indicatorId: $servicesIndicatorId, endRow: $endRow);
 
 
+
+
+        //////////////////////////////
+        // Круглосуточный ст.
+        //////////////////////////////
         $hospitalizationsIndicatorId = 7; // госпитализаций
         $sheet = $spreadsheet->getSheetByName('5. Круглосуточный ст.');
         $sheet->setCellValue([1, 3], "Объемы медицинской помощи в условиях круглосуточного стационара (не включая ВМП и медицинскую реабилитацию) на $year год");
@@ -1262,6 +1429,23 @@ class SummaryVolumeReportService {
                 }
             }
         }
+
+
+        // ОГЛАВЛЕНИЕ
+        $sheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, 'Оглавление');
+        $spreadsheet->addSheet($sheet, 0);
+        $sheetCount = $spreadsheet->getSheetCount();
+        for ($i = 1; $i < $sheetCount; $i++){
+            $s = $spreadsheet->getSheet($i);
+            $st = $s->getTitle();
+            $colName = Coordinate::stringFromColumnIndex(1);
+           //echo '=HYPERLINK("#\'' . $st . '\'!' . "A1" . '";"' . $st . '")' . '<br>';
+            $sheet->setCellValue([1, $i], $st);
+            $spreadsheet->addNamedRange( new \PhpOffice\PhpSpreadsheet\NamedRange('my_named_range_' . $i, $s, 'A1'));
+            $sheet->getCell([1, $i])->getHyperlink()->setUrl('sheet://my_named_range_' . $i);
+
+        }
+        $spreadsheet->setActiveSheetIndex(0);
 
         return $spreadsheet;
     }

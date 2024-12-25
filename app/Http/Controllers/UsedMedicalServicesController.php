@@ -12,7 +12,7 @@ use Validator;
 class UsedMedicalServicesController extends Controller
 {
     /**
-     * Возвращает массив id профилей коек для переданного id узла дерева категорий
+     * Возвращает массив id медицинских (диагностических) услуг для переданного id узла дерева категорий
      *
      * @return \Illuminate\Http\Response
      */

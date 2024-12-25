@@ -41,9 +41,9 @@ class PlanReports extends Controller
     }
 
 
-    public function SummaryVolume (SummaryVolumeReportService $reportService, int $year, int $commissionDecisionsId = null) {
+    public function SummaryVolume(SummaryVolumeReportService $reportService, int $year, int $commissionDecisionsId = null) {
         $path = 'xlsx';
-        $templateFileName = '1.xlsx';
+        $templateFileName = 'templateSummaryVolume20241223.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
         $resultFileName = "объемы($year-$commissionDecisionsId).xlsx";

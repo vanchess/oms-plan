@@ -1148,7 +1148,7 @@ Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForCont
         $indicatorId = 6; // услуг
         $serviceId = MedicalServicesEnum::MolecularGeneticDetectionOncological;
         $hasValue = false;
-        $planningSectionName = "Малекулярно-генетические исследования с целью диагностики онкологических заболеваний";
+        $planningSectionName = "Молекулярно-генетические исследования с целью диагностики онкологических заболеваний";
         $planningParamName = "объемы, услуг";
 
         $values = [];
@@ -1178,7 +1178,7 @@ Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForCont
         $indicatorId = 4; // стоимость
         $serviceId = MedicalServicesEnum::MolecularGeneticDetectionOncological;
         $hasValue = false;
-        $planningSectionName = "Малекулярно-генетические исследования с целью диагностики онкологических заболеваний";
+        $planningSectionName = "Молекулярно-генетические исследования с целью диагностики онкологических заболеваний";
         $planningParamName = "финансовое обеспечение, руб.";
 
         $values = [];

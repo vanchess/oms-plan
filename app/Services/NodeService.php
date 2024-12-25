@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\DB;
 
 class NodeService
 {
+
+    function __construct(
+        private MedicalServicesService $medicalServicesService
+    ) { }
+
     /**
      * Возвращает массив id показателей используемых для переданного id узла дерева категорий
      *
@@ -88,13 +93,7 @@ class NodeService
 
     public function medicalServicesForNodeId(int $nodeId)
     {
-        $column = 'service_id';
-        $usedIds = PlannedIndicator::select($column)->where('node_id', $nodeId)->whereNotNull($column)->groupBy($column)->pluck($column)->toArray();
-        if(count($usedIds) === 0) {
-            return [];
-        }
-        sort($usedIds);
-        return $usedIds;
+        return $this->medicalServicesService->getIdsByNodeId($nodeId);
     }
 
     private function nodeWithChildren(int $nodeId)
