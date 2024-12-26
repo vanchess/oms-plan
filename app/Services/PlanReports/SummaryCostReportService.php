@@ -90,8 +90,9 @@ class SummaryCostReportService
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [16])); // Диспансеризация опекаемых
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [17])); // Профосмотры взрослых
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [18])); // Профосмотры несовершеннолетних
-            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [19])); // Школа сахарного диабета
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [19, 23, 24, 25])); // Школа сахарного диабета
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [8])); // Медицинская реабилитация
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [22])); // центры здоровья
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
