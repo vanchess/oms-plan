@@ -57,6 +57,7 @@ class SummaryVolumeReportService {
     { }
 
     private function fillPolyclinicSheet(Worksheet $sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, int $startRow, int $serviceId, int $indicatorId, string $category = 'polyclinic', $endRow = 100) {
+        $emptyLinesCount = 1; // количество пустых строк (под МТР)
         $ordinalRowNum = 0;
         $rowIndex = $startRow - 1;
 
@@ -77,13 +78,15 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount, $endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, 7, 20, $startRow, $rowIndex+$emptyLinesCount);
     }
 
 
 
     public function generate(string $templateFullFilepath, int $year, int $commissionDecisionsId = null) : Spreadsheet {
+        $emptyLinesCount = 1; // количество пустых строк (под МТР)
+
         $packageIds = null;
         $currentlyUsedDate = $year.'-01-01';
         $docName = "";
@@ -149,8 +152,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([9 + $monthNum, $rowIndex],  ($contentByMonth[$monthNum]['mo'][$mo->id][$category][$callsAssistanceTypeId][$indicatorId] ?? 0) + $thrombolysis);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 21, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount, $endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, 7, 21, $startRow, $rowIndex+$emptyLinesCount);
 
 
         $sheet = $spreadsheet->getSheetByName('2.обращения по заболеваниям');
@@ -190,8 +193,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([8 + $monthNum, $rowIndex],  ($perPerson + $perUnit + $fap));
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, 7, 20, $startRow, $rowIndex+$emptyLinesCount);
 
         $sheet = $spreadsheet->getSheetByName('2.1 Мед. реабилитация амб.усл.');
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год (медицинская реабилитация)");
@@ -238,8 +241,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, 7, 20, $startRow, $rowIndex+$emptyLinesCount);
 
         ///////////////////////////////
         // 2.2 Диспансерное наблюдение (АП, по тарифу)
@@ -379,7 +382,7 @@ class SummaryVolumeReportService {
             $curRow++;
             $tableBodyStartRow = $curRow;
 
-            $totalRow = $tableBodyStartRow + count($arrayData);
+            $totalRow = $tableBodyStartRow + count($arrayData) + $emptyLinesCount;
             $tableBodyEndRow = $totalRow - 1;
             $tableEndRow = $totalRow;
             // Вставляем данные из массива в таблицу
@@ -525,8 +528,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, 7, 20, $startRow, $rowIndex+$emptyLinesCount);
 
 
         /////////////////////
@@ -583,8 +586,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex+$emptyLinesCount);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -645,8 +648,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex+$emptyLinesCount);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -706,8 +709,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex+$emptyLinesCount);
 
         // Заголовок листа
         $curRow = 0;
@@ -768,8 +771,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex+$emptyLinesCount);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -828,8 +831,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex+$emptyLinesCount);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -898,8 +901,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, 7, 20, $startRow, $rowIndex+$emptyLinesCount);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -960,8 +963,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([8 + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, 7, 20, $startRow, $rowIndex+$emptyLinesCount);
         // Заголовок листа
         $curRow = 0;
         $curCol = 1;
@@ -1115,7 +1118,7 @@ class SummaryVolumeReportService {
             $curRow++;
             $tableBodyStartRow = $curRow;
 
-            $totalRow = $tableBodyStartRow + count($arrayData);
+            $totalRow = $tableBodyStartRow + count($arrayData) + $emptyLinesCount;
             $tableBodyEndRow = $totalRow - 1;
             $tableEndRow = $totalRow;
             // Вставляем данные из массива в таблицу
@@ -1314,7 +1317,7 @@ class SummaryVolumeReportService {
                 $curRow++;
                 $tableBodyStartRow = $curRow;
 
-                $totalRow = $tableBodyStartRow + count($arrayData);
+                $totalRow = $tableBodyStartRow + count($arrayData) + $emptyLinesCount;
                 $tableBodyEndRow = $totalRow - 1;
                 $tableEndRow = $totalRow;
                 // Вставляем данные из массива в таблицу
@@ -1479,8 +1482,8 @@ class SummaryVolumeReportService {
                 $sheet->setCellValue([8 + $monthNum, $rowIndex], $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1 + $emptyLinesCount,$endRow-$rowIndex - $emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1 + $emptyLinesCount, 7, 20, $startRow, $rowIndex + $emptyLinesCount);
 
 
 

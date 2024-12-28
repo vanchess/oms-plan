@@ -10,6 +10,9 @@ trait HospitalSheetTrait
     private function fillHospitalSheet(Worksheet $sheet, $content, $contentByMonth, $moCollection, int $startRow, string $daytimeOrRoundClock, array $hospitalSubTypes, int $rehabilitationBedOption, int $indicatorId, string $category = 'hospital', $endRow = 100) {
         bcscale(4);
 
+        $tableDataStartCol = 7;
+        $tableEndCol = 19;
+        $emptyLinesCount = 1; // количество пустых строк (под МТР)
         $ordinalRowNum = 0;
         $rowIndex = $startRow - 1;
 
@@ -26,7 +29,7 @@ trait HospitalSheetTrait
                 $v = bcadd($v, $addV);
             }
 
-            $sheet->setCellValue([7,$rowIndex], $v);
+            $sheet->setCellValue([$tableDataStartCol, $rowIndex], $v);
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
                 $v = '0';
@@ -34,16 +37,19 @@ trait HospitalSheetTrait
                     $addV = PlanCalculatorService::hospitalBedProfilesSum($contentByMonth[$monthNum], $mo->id, $daytimeOrRoundClock, $hospitalSubType, $rehabilitationBedOption, $indicatorId, $category);
                     $v = bcadd($v, $addV);
                 }
-                $sheet->setCellValue([7 + $monthNum, $rowIndex],  $v);
+                $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1 + $emptyLinesCount,$endRow-$rowIndex - $emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1 + $emptyLinesCount, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex + $emptyLinesCount);
     }
 
     private function fillHospitalVmpSheet(Worksheet $sheet, $content, $contentByMonth, $moCollection, int $startRow, string $daytimeOrRoundClock, string $hospitalSubType = 'vmp', int $indicatorId = 7, string $category = 'hospital', $endRow = 100) {
         bcscale(4);
 
+        $tableDataStartCol = 7;
+        $tableEndCol = 19;
+        $emptyLinesCount = 1; // количество пустых строк (под МТР)
         $ordinalRowNum = 0;
         $rowIndex = $startRow - 1;
 
@@ -56,14 +62,14 @@ trait HospitalSheetTrait
 
             $v = PlanCalculatorService::hospitalVmpSum($content, $mo->id, $daytimeOrRoundClock, $hospitalSubType, $indicatorId, $category);
 
-            $sheet->setCellValue([7,$rowIndex], $v);
+            $sheet->setCellValue([$tableDataStartCol, $rowIndex], $v);
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
                 $v  = PlanCalculatorService::hospitalVmpSum($contentByMonth[$monthNum], $mo->id, $daytimeOrRoundClock, $hospitalSubType, $indicatorId, $category);
-                $sheet->setCellValue([7 + $monthNum, $rowIndex],  $v);
+                $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1 + $emptyLinesCount,$endRow-$rowIndex - $emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1 + $emptyLinesCount, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex + $emptyLinesCount);
     }
 }

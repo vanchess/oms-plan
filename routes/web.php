@@ -4245,7 +4245,7 @@ Route::get('/{year}/{commissionDecisionsId?}', function (Request $request, DataF
     $indicators = Indicator::select('id','name')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
     Storage::put($path.'indicators.json', $indicators);
 
-    $medicalServices = MedicalServices::select('id','name')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
+    $medicalServices = MedicalServices::select('id','name','slug','allocateVolumes','order')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();
     Storage::put($path.'medicalServices.json', $medicalServices);
 
     $medicalAssistanceType = MedicalAssistanceType::select('id','name')->get()->mapWithKeys(function($item) {return [$item->id => $item];})->toJson();

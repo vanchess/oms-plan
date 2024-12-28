@@ -20,6 +20,8 @@ class SummaryCostReportService
     use SummaryReportTrait;
     use HospitalSheetTrait;
 
+    private $emptyLinesCount = 1; // количество пустых строк (под МТР)
+
     public function __construct(
         private DataForContractService $dataForContractService,
         private PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService,
@@ -51,8 +53,8 @@ class SummaryCostReportService
                 $sheet->setCellValue([8 + $monthNum, $rowIndex], bcadd($calls, $thrombolysis));
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, 20, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1 + $this->emptyLinesCount, $endRow-$rowIndex - $this->emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1 + $this->emptyLinesCount, 7, 20, $startRow, $rowIndex + $this->emptyLinesCount);
     }
 
     private function fillPolyclinicSheet(Worksheet $sheet, $content, $contentByMonth, $peopleAssigned, $moCollection, int $startRow, int $indicatorId, string $category = 'polyclinic', $endRow = 100) {
@@ -117,8 +119,8 @@ class SummaryCostReportService
                 $sheet->setCellValue([$curCol + $monthNum, $rowIndex], $v);
             }
         }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
-        $this->fillSummaryRow($sheet, $rowIndex+1, 7, $curCol + 12, $startRow, $rowIndex);
+        $sheet->removeRow($rowIndex+1 + $this->emptyLinesCount,$endRow-$rowIndex - $this->emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1 + $this->emptyLinesCount, 7, $curCol + 12, $startRow, $rowIndex + $this->emptyLinesCount);
     }
 
     public function generate(string $templateFullFilepath, int $year, int $commissionDecisionsId = null) : Spreadsheet
