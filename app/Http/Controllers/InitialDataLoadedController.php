@@ -43,7 +43,7 @@ class InitialDataLoadedController extends Controller
         $validator = Validator::make($request->all(),[
             'year' => 'required|integer|min:2020|max:2099',
             'nodes' => 'required|array',
-            'nodes.*' => 'required|integer|distinct|min:1|max:45',
+            'nodes.*' => 'required|integer|distinct|min:1|max:90',
         ]);
         if ($validator->fails()) {
             return response()->json($validator->errors()->toJson(), 400);

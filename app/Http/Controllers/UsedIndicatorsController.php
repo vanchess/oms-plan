@@ -19,7 +19,7 @@ class UsedIndicatorsController extends Controller
     public function indicatorsUsedForNodeId(Request $request, NodeService $nodeService)
     {
         $validator = Validator::make($request->all(),[
-            'node' => 'required|integer|min:1|max:45'
+            'node' => 'required|integer|min:1|max:90'
         ]);
         if ($validator->fails()) {
             return response()->json($validator->errors()->toJson(), 400);

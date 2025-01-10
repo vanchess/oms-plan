@@ -24,7 +24,7 @@ class InitialDataController extends Controller
     public function index(Request $request, InitialDataService $initialDataService)
     {
         $validator = Validator::make($request->all(),[
-            'node' => 'required|integer|min:1|max:45',
+            'node' => 'required|integer|min:1|max:90',
             'year' => 'required|integer|min:2020|max:2099'
         ]);
         if ($validator->fails()) {
