@@ -87,7 +87,8 @@ class SummaryCostReportService
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [9,10,11,12])); // Диспансерное наблюдение
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [13])); // Диспансеризация взрослого населения
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [14])); // Углубленная диспансеризация
-            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [20,21])); // Диспансеризация для оценки репродуктивного здоровья
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [20])); // Диспансеризация для оценки репродуктивного здоровья женщин репродуктивного возраста
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [21])); // Диспансеризация для оценки репродуктивного здоровья мужчин репродуктивного возраста
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [15])); // Диспансеризация сирот
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [16])); // Диспансеризация опекаемых
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [17])); // Профосмотры взрослых
