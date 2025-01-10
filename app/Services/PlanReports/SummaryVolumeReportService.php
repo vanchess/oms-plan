@@ -664,15 +664,66 @@ class SummaryVolumeReportService {
         $sheetSubsectionNumber++;
         $sheet = clone $spreadsheet->getSheetByName('3.1 Диспансеризация');
 
-        $sheetName = 'Дисп.репрод.';
+        $sheetName = 'Дисп.репрод.женщин';
         $sheet->setTitle(mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
         $spreadsheet->addSheet($sheet, ++$sheetIndex);
-        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, диспансеризация для оценки репродуктивного здоровья");
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, диспансеризация для оценки репродуктивного здоровья женщин репродуктивного возраста");
         $ordinalRowNum = 0;
         $rowIndex = $startRow - 1;
         $category = 'polyclinic';
         $indicatorId = 9; // посещений
-        $assistanceTypeIds = [20, 21]; //	женщин репродуктивного возраста, мужчин репродуктивного возраста
+        $assistanceTypeIds = [20]; //	женщин репродуктивного возраста
+        foreach($moCollection as $mo) {
+            $ordinalRowNum++;
+            $rowIndex++;
+            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
+            // $sheet->setCellValue([1,$rowIndex], $mo->code);
+            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
+            $v = 0;
+            foreach($assistanceTypeIds as $assistanceTypeId) {
+                $perPerson = $content['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $perUnit = $content['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                $faps = $content['mo'][$mo->id][$category]['fap'] ?? [];
+                $fap = 0;
+                foreach ($faps as $f) {
+                    $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                }
+                $v += ($perPerson + $perUnit + $fap);
+            }
+
+            $sheet->setCellValue([$tableDataStartCol, $rowIndex], $v);
+
+            for($monthNum = 1; $monthNum <= 12; $monthNum++)
+            {
+                $v = 0;
+                foreach($assistanceTypeIds as $assistanceTypeId) {
+                    $perPerson = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perPerson']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $perUnit = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['perUnit']['all']['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    $faps = $contentByMonth[$monthNum]['mo'][$mo->id][$category]['fap'] ?? [];
+                    $fap = 0;
+                    foreach ($faps as $f) {
+                        $fap += $f['assistanceTypes'][$assistanceTypeId][$indicatorId] ?? 0;
+                    }
+                    $v += ($perPerson + $perUnit + $fap);
+                }
+                $sheet->setCellValue([$tableDataStartCol + $monthNum, $rowIndex],  $v);
+            }
+        }
+        $sheet->removeRow($rowIndex+1+$emptyLinesCount,$endRow-$rowIndex-$emptyLinesCount);
+        $this->fillSummaryRow($sheet, $rowIndex+1+$emptyLinesCount, $tableDataStartCol, $tableEndCol, $startRow, $rowIndex+$emptyLinesCount);
+
+        $sheetSubsectionNumber++;
+        $sheet = clone $spreadsheet->getSheetByName('3.1 Диспансеризация');
+
+        $sheetName = 'Дисп.репрод.мужчин';
+        $sheet->setTitle(mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+        $spreadsheet->addSheet($sheet, ++$sheetIndex);
+        $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, диспансеризация для оценки репродуктивного здоровья мужчин репродуктивного возраста");
+        $ordinalRowNum = 0;
+        $rowIndex = $startRow - 1;
+        $category = 'polyclinic';
+        $indicatorId = 9; // посещений
+        $assistanceTypeIds = [21]; //	мужчин репродуктивного возраста
         foreach($moCollection as $mo) {
             $ordinalRowNum++;
             $rowIndex++;
