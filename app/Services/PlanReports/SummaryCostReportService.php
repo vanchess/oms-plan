@@ -96,6 +96,7 @@ class SummaryCostReportService
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [19, 23, 24, 25])); // Школа сахарного диабета
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [8])); // Медицинская реабилитация
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [22])); // центры здоровья
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [26])); // школа для больных с хроническими заболеваниями
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {
