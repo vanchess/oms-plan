@@ -24,7 +24,7 @@ class PlanReports extends Controller
         $protocolNumberForFileName = preg_replace('/[^a-zа-я\d.]/ui', '_', $protocolNumber);
 
         $path = 'xlsx';
-        $templateFileName = 'meetingMinutes.xlsx';
+        $templateFileName = 'meetingMinutes20250120.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
 

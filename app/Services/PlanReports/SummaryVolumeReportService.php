@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace App\Services\PlanReports;
 
-use App\Enum\MedicalServicesEnum;
 use App\Enum\RehabilitationBedOptionEnum;
 use App\Models\CareProfiles;
 use App\Models\Category;

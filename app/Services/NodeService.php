@@ -13,7 +13,8 @@ class NodeService
 {
 
     function __construct(
-        private MedicalServicesService $medicalServicesService
+        private MedicalServicesService $medicalServicesService,
+        private MedicalAssistanceTypesService $medicalAssistanceTypesService
     ) { }
 
     /**
@@ -82,13 +83,7 @@ class NodeService
 
     public function medicalAssistanceTypesForNodeId(int $nodeId)
     {
-        $column = 'assistance_type_id';
-        $usedIds = PlannedIndicator::select($column)->where('node_id', $nodeId)->whereNotNull($column)->groupBy($column)->pluck($column)->toArray();
-        if(count($usedIds) === 0) {
-            return [];
-        }
-        sort($usedIds);
-        return $usedIds;
+        return $this->medicalAssistanceTypesService->getIdsByNodeId($nodeId);
     }
 
     public function medicalServicesForNodeId(int $nodeId)

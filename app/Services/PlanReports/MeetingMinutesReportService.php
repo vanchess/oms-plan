@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace App\Services\PlanReports;
 
-use App\Enum\MedicalServicesEnum;
 use App\Models\CareProfilesFoms;
 use App\Models\Category;
 use App\Models\CategoryTreeNodes;
@@ -15,6 +14,8 @@ use App\Models\MedicalInstitution;
 use App\Models\MedicalServices;
 use App\Models\PlannedIndicator;
 use App\Services\DataForContractService;
+use App\Services\MedicalAssistanceTypesService;
+use App\Services\MedicalServicesService;
 use App\Services\NodeService;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -25,7 +26,9 @@ class MeetingMinutesReportService
 {
     public function __construct(
         private DataForContractService $dataForContractService,
-        private NodeService $nodeService
+        private NodeService $nodeService,
+        private MedicalServicesService $medicalServicesService,
+        private MedicalAssistanceTypesService $medicalAssistanceTypesService
     ){ }
 
     public function generate(string $templateFullFilepath, int $year, int $commissionDecisionsId) : Spreadsheet {
@@ -48,6 +51,7 @@ class MeetingMinutesReportService
 
         $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
         $spreadsheet = $reader->load($templateFullFilepath);
+
         $sheet = $spreadsheet->getSheetByName('Скорая помощь');
         $sheet->setCellValue([1,3], $docName);
         $ordinalRowNum = 0;
@@ -76,87 +80,6 @@ class MeetingMinutesReportService
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
 
 
-
-
-        $sheet = $spreadsheet->getSheetByName('Диагностика');
-        $sheet->setCellValue([1,3], $docName);
-        $ordinalRowNum = 0;
-        $rowIndex = $startRow;
-        $category = 'polyclinic';
-        $indicatorId = 6; // услуг
-        $costIndicatorId = 4; // стоимость
-
-        foreach($moCollection as $mo) {
-            // КТ
-            $serviceId = MedicalServicesEnum::KT;
-            $kt = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $indicatorId);
-            $costKt = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $costIndicatorId);
-
-            // МРТ
-            $serviceId = MedicalServicesEnum::MRT;
-            $mrt = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $indicatorId);
-            $costMrt = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $costIndicatorId);
-
-            // УЗИ ССС
-            $serviceId = MedicalServicesEnum::UltrasoundCardio;
-            $ultrasoundCardio = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $indicatorId);
-            $costUltrasoundCardio = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $costIndicatorId);
-
-            // Эндоскопия
-            $serviceId = MedicalServicesEnum::Endoscopy;
-            $endoscopy = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $indicatorId);
-            $costEndoscopy = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $costIndicatorId);
-
-            // ПАИ
-            $serviceId = MedicalServicesEnum::PathologicalAnatomicalBiopsyMaterial;
-            $pathologicalAnatomicalBiopsyMaterial = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $indicatorId);
-            $costPathologicalAnatomicalBiopsyMaterial = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $costIndicatorId);
-
-            // МГИ
-            $serviceId = MedicalServicesEnum::MolecularGeneticDetectionOncological;
-            $molecularGeneticDetectionOncological = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $indicatorId);
-            $costMolecularGeneticDetectionOncological = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $costIndicatorId);
-
-            // Тест.covid-19
-            $serviceId = MedicalServicesEnum::CovidTesting;
-            $covidTesting = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $indicatorId);
-            $costCovidTesting = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $costIndicatorId);
-
-            if( bccomp($kt,'0') === 0
-                && bccomp($mrt, '0') === 0
-                && bccomp($ultrasoundCardio, '0') === 0
-                && bccomp($endoscopy, '0') === 0
-                && bccomp($pathologicalAnatomicalBiopsyMaterial, '0') === 0
-                && bccomp($molecularGeneticDetectionOncological, '0') === 0
-                && bccomp($covidTesting, '0') === 0
-                && bccomp($costKt, '0') === 0
-                && bccomp($costMrt, '0') === 0
-                && bccomp($costEndoscopy, '0') === 0
-                && bccomp($costPathologicalAnatomicalBiopsyMaterial, '0') === 0
-                && bccomp($costMolecularGeneticDetectionOncological, '0') === 0
-                && bccomp($costCovidTesting, '0') === 0
-            ) {continue;}
-
-            $ordinalRowNum++;
-            $rowIndex++;
-            $sheet->setCellValue([1,$rowIndex], "$ordinalRowNum");
-            $sheet->setCellValue([2,$rowIndex], $mo->short_name);
-            $sheet->setCellValue([3,$rowIndex], $kt);
-            $sheet->setCellValue([4,$rowIndex], $costKt);
-            $sheet->setCellValue([5,$rowIndex], $mrt);
-            $sheet->setCellValue([6,$rowIndex], $costMrt);
-            $sheet->setCellValue([7,$rowIndex], $endoscopy);
-            $sheet->setCellValue([8,$rowIndex], $costEndoscopy);
-            $sheet->setCellValue([9,$rowIndex], $ultrasoundCardio);
-            $sheet->setCellValue([10,$rowIndex], $costUltrasoundCardio);
-            $sheet->setCellValue([11,$rowIndex], $pathologicalAnatomicalBiopsyMaterial);
-            $sheet->setCellValue([12,$rowIndex], $costPathologicalAnatomicalBiopsyMaterial);
-            $sheet->setCellValue([13,$rowIndex], $molecularGeneticDetectionOncological);
-            $sheet->setCellValue([14,$rowIndex], $costMolecularGeneticDetectionOncological);
-            $sheet->setCellValue([15,$rowIndex], $covidTesting);
-            $sheet->setCellValue([16,$rowIndex], $costCovidTesting);
-        }
-        $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
 
         $careProfilesFoms = CareProfilesFoms::all();
 
@@ -485,6 +408,175 @@ class MeetingMinutesReportService
         }
         $sheet->removeRow($rowIndex+1,$endRow-$rowIndex);
 
+
+        ///////////////////////////////
+        // Диагностика (услуги выделенные на федеральном уровне)
+        // по тарифу + подушевое + ФАП (реально объемы услуг по подушевому и ФАП никогда не выделялись...)
+        ///////////////////////////////
+        $sheetSectionNumber = 2;
+        $sheetSubsectionNumber = 2;
+        $sheetName = "Диагностика";
+
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial');
+        $spreadsheet->getDefaultStyle()->getFont()->setSize(12);
+
+        $sheetIndex = 0;
+
+        /// список диагностических услуг актуальных на текущий год
+        $medicalServiceIds = $this->medicalServicesService->getIdsByYear($year);
+        // услуги выделенные на федеральном уровне (allocateVolumes = true)
+        $medicalServices = MedicalServices::where('allocateVolumes', true)->whereIn('id', $medicalServiceIds)->orderBy('order')->get();
+
+        $indicatorId = 6; // услуг
+        $costIndicatorId = 4; // стоимость
+
+        // Данные таблицы
+        $dataRow = 0;
+        $arrayData = [];
+        $tableHasData = true;
+        foreach($moCollection as $mo) {
+            $rowHasData = false;
+            $dataCol = 0;
+
+            $dataRowArray = [];
+            $dataRowArray[++$dataCol] = $dataRow + 1;
+            $dataRowArray[++$dataCol] = $mo->code;
+            $dataRowArray[++$dataCol] = $mo->short_name;
+
+            foreach ($medicalServices as $ms) {
+                $serviceId = $ms->id;
+                $quantVal = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $indicatorId);
+                $costVal = PlanCalculatorService::medicalServicesSum($content, $mo->id, $serviceId, $costIndicatorId);
+
+                $dataRowArray[++$dataCol] = $quantVal;
+                $dataRowArray[++$dataCol] = $costVal;
+
+                if (!$rowHasData) {
+                    $rowHasData = bccomp($quantVal, '0') !== 0 || bccomp($costVal, '0') !== 0;
+                }
+            }
+
+            if ($rowHasData) {
+                $arrayData[$dataRow] = $dataRowArray;
+                $dataRow++;
+            }
+        }
+
+
+        if ($tableHasData) {
+            $sheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, mb_substr("$sheetName", 0, 31));
+            $spreadsheet->addSheet($sheet, ++$sheetIndex);
+            $minimumDataCellWidth = 12;
+
+            $curRow = 4;
+            $curCol = 1;
+            $tableStartCol = $curCol;
+            $tableEndCol = $curCol;
+            $tableHeadStartRow = $curRow;
+            $tableHeadEndRow = $curRow;
+            $staticTableHeadStartCol = $curCol;
+            // Статическая часть заголовка таблицы
+            $sheet->setCellValue([$curCol, $curRow], '№ п/п');
+            $strwidth = mb_strwidth(' № п/п ');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth($strwidth);
+            $sheet->setCellValue([++$curCol, $curRow], 'Код МО');
+            // $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+
+            $sheet->setCellValue([++$curCol, $curRow], 'Медицинская организация');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth(50);
+            $staticTableHeadEndCol = $curCol;
+
+            // $sheet->setCellValue([++$curCol, $curRow], "Всего, $quantIndicator->name");
+            // $tableTotalCol = $curCol;
+            // $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            $sheet->setCellValue([++$curCol, $curRow], 'корректировка');
+            $tableIncludingSectionStartCol = $curCol;
+            $tableIncludingSectionEndCol = $curCol;
+
+            $curRow++;
+            // Динамическая часть заголовка таблицы
+            foreach ($medicalServices as $ms) {
+                $medicalServiceName = \Illuminate\Support\Str::ucfirst($ms->name);
+                $sheet->setCellValue([$curCol, $curRow], $medicalServiceName);
+                $sheet->setCellValue([$curCol, $curRow + 1], 'объемы, услуг');
+                $sheet->setCellValue([$curCol + 1, $curRow + 1], 'финансовое обеспечение, руб.');
+                $width = $minimumDataCellWidth;
+                $wordArr = explode(' ', $medicalServiceName);
+                foreach ($wordArr as $s) {
+                    $width = max($width, round(mb_strwidth ($s) / 2) + 2);
+                }
+
+                $sheet->getColumnDimensionByColumn($curCol)->setWidth($width);
+                $sheet->getColumnDimensionByColumn($curCol + 1)->setWidth($width);
+                $sheet->getRowDimension($curRow)->setRowHeight(count($wordArr) * 15);
+                $sheet->mergeCells([$curCol, $curRow, $curCol + 1, $curRow]);
+                $sheet->getStyle([$curCol, $curRow, $curCol + 1, $curRow + 1])->getAlignment()->setWrapText(true);
+                $tableIncludingSectionEndCol = $curCol + 1;
+
+                $curCol += 2;
+            }
+            $tableEndCol = $curCol - 1;
+
+            $tableHeadEndRow = $curRow + 1;
+            $curRow++;
+            $tableBodyStartRow = $curRow + 1;
+
+            $totalRow = $tableBodyStartRow + count($arrayData);
+            $tableBodyEndRow = $totalRow - 1;
+            $tableEndRow = $totalRow;
+            // Вставляем данные из массива в таблицу
+            $sheet->fromArray($arrayData, null, Coordinate::stringFromColumnIndex($tableStartCol) . $tableBodyStartRow);
+
+            // Строка итогов
+            $sheet->setCellValue([$staticTableHeadStartCol, $totalRow], 'Итого');
+            for ($c = $staticTableHeadEndCol + 1; $c <= $tableEndCol; $c++) {
+                $colStringName = Coordinate::stringFromColumnIndex($c);
+                $sheet->setCellValue([$c, $totalRow],'=sum(' . $colStringName . $tableBodyStartRow . ':' . $colStringName . $tableBodyEndRow . ')');
+            }
+            // Объдинение ячеек и выравнивание такста заголовка и итога
+            for($ci = $staticTableHeadStartCol; $ci <= $staticTableHeadEndCol; $ci++) {
+                $sheet->mergeCells([$ci, $tableHeadStartRow, $ci, $tableHeadEndRow]);
+            }
+
+            $sheet->mergeCells([$tableIncludingSectionStartCol, $tableHeadStartRow, $tableIncludingSectionEndCol, $tableHeadStartRow]);
+            $sheet->mergeCells([$staticTableHeadStartCol, $totalRow, $staticTableHeadEndCol, $totalRow]);
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableHeadEndRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableStartCol, $totalRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableEndCol, $totalRow])->getFont()->setBold(true);
+            // Border таблицы
+            $styleArray = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableEndRow])->applyFromArray($styleArray);
+
+            // Заголовок листа
+            $curRow = 0;
+            $curCol = 1;
+
+            $titleCol = $curCol;
+            $titleRow = $curRow + 1;
+            $sheet->setCellValue([$titleCol, $titleRow], "Корректировка объемов и финансового обеспечения медицинской помощи");
+            $sheet->setCellValue([$titleCol, $titleRow + 1], "Диагностические лабораторные исследования");
+            $sheet->setCellValue([$titleCol, $titleRow + 2], $docName);
+
+            // $sheet->getStyle([$titleCol, $titleRow, $titleCol, $titleRow])->getFont()->setBold(true);
+            $sheet->getRowDimension($titleRow)->setRowHeight(20);
+            $sheet->freezePane([$staticTableHeadEndCol + 1, $tableBodyStartRow]);
+
+            $sheetSubsectionNumber++;
+        }
+
+
         ////////////////////////
         // Поликлиника по тарифу
         ////////////////////////
@@ -500,13 +592,13 @@ class MeetingMinutesReportService
             $node = CategoryTreeNodes::find($nodeId);
             $category = Category::find($node->category_id);
 
-            $medicalAssistanceTypeIds = $this->nodeService->medicalAssistanceTypesForNodeId($nodeId);
-            $medicalServiceIds = $this->nodeService->medicalServicesForNodeId($nodeId);
+            $medicalAssistanceTypeIds = $this->medicalAssistanceTypesService->getIdsByNodeIdAndYear($nodeId, $year);
+            $medicalServiceIds = $this->medicalServicesService->getIdsByNodeIdAndYear($nodeId, $year);
             $plannedIndicatorsForNodeId = PlannedIndicator::find($this->nodeService->plannedIndicatorsForNodeId($nodeId));
             $allIndicators = Indicator::all();
 
             $arr['assistanceTypes'] = MedicalAssistanceType::find($medicalAssistanceTypeIds);
-            $arr['services'] = MedicalServices::find($medicalServiceIds);
+            $arr['services'] = MedicalServices::whereIn('id', $medicalServiceIds)->orderBy('order')->get();
 
             // Данные таблицы
             $dataRow = 0;
@@ -592,9 +684,10 @@ class MeetingMinutesReportService
                 // Динамическая часть заголовка таблицы
                 foreach($arr as $key => $colunms) {
                     foreach($colunms as $t) {
-                        $sheet->setCellValue([$curCol, $curRow], $t->name);
+                        $tName = $t->name;
+                        $sheet->setCellValue([$curCol, $curRow], $tName);
                         $sheet->mergeCells([$curCol, $curRow, $curCol + $step - 1, $curRow]);
-                        $halfWidth = round(mb_strwidth ($t->name) / 2) + 2;
+                        $halfWidth = round(mb_strwidth ($tName) / 2) + 2;
 
                         $indicatorIds = $plannedIndicatorsForNodeId->filter(function ($value) use ($t, $key) {
                             if ($key == 'assistanceTypes') {
@@ -608,13 +701,21 @@ class MeetingMinutesReportService
                         $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
                         // $finIndicator = $indicators->firstWhere('type_id', $typeFinId);
 
-                        $sheet->getColumnDimensionByColumn($curCol)->setWidth(max(mb_strwidth($quantIndicator->name)+2, $halfWidth, $minimumVolumeDataCellWidth));
-                        $sheet->getColumnDimensionByColumn($curCol + 1)->setWidth(max($halfWidth, $minimumMoneyDataCellWidth));
                         $sheet->setCellValue([$curCol, $curRow + 1], 'объемы, ' . $quantIndicator->name);
-                        $sheet->getRowDimension($curRow + 1)->setRowHeight(50);
                         $sheet->setCellValue([$curCol + 1, $curRow + 1], 'финансовое обеспечение, руб.');
+                        $sheet->getRowDimension($curRow + 1)->setRowHeight(50);
                         $sheet->getStyle([$curCol, $curRow + 1, $curCol + 1, $curRow + 1])->getAlignment()->setWrapText(true);
 
+
+                        $width = $minimumDataCellWidth;
+                        $wordArr = explode(' ', $tName);
+                        foreach ($wordArr as $s) {
+                            $width = max($width, round(mb_strwidth ($s) / 2) + 2);
+                        }
+                        $sheet->getColumnDimensionByColumn($curCol)->setWidth( max(mb_strwidth($quantIndicator->name)+2, $width, $minimumVolumeDataCellWidth));
+                        $sheet->getColumnDimensionByColumn($curCol + 1)->setWidth(max($width, $minimumMoneyDataCellWidth));
+                        $sheet->getRowDimension($curRow)->setRowHeight(count($wordArr) * 15);
+                        $sheet->getStyle([$curCol, $curRow, $curCol + 1, $curRow + 1])->getAlignment()->setWrapText(true);
                         $tableEndCol = $curCol + $step - 1;
                         $curCol += $step;
                     }
@@ -661,6 +762,9 @@ class MeetingMinutesReportService
                 $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableEndRow])->applyFromArray($styleArray);
             }
         }
+        /////////////////////////////////////////
+        // end Поликлиника по тарифу
+        ////////////////////////////////////////
 
         $sheet = $spreadsheet->getSheetByName('АП (по тарифу)');
 
