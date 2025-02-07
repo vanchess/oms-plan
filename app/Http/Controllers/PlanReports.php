@@ -1,17 +1,15 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\ChangePackage;
 use App\Models\CommissionDecision;
-use App\Services\PlannedIndicatorChangeInitService;
-use App\Services\InitialDataFixingService;
 use App\Services\PlanReports\MeetingMinutesReportService;
 use App\Services\PlanReports\NumberOfBedsReportService;
 use App\Services\PlanReports\SummaryCostReportService;
 use App\Services\PlanReports\SummaryVolumeReportService as SummaryVolumeReportService;
 use App\Services\PlanReports\PumpPggReportService;
-use Illuminate\Http\Request;
+use App\Services\PlanReports\VitacorePlanReportService;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
@@ -103,6 +101,29 @@ class PlanReports extends Controller
         $fullResultFilepath = Storage::path($resultFilePath);
 
         $spreadsheet = $reportService->generate($templateFullFilepath, year: $year, commissionDecisionsId: $commissionDecisionsId);
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($fullResultFilepath);
+        return Storage::download($resultFilePath);
+    }
+
+    public function VitacorePlan(VitacorePlanReportService $reportService, int $year, int $commissionDecisionsId = null) {
+        $protocolNumber = 0;
+        $protocolDate = '';
+        if ($commissionDecisionsId) {
+            $cd = CommissionDecision::find($commissionDecisionsId);
+            $protocolDate = $cd->date->format('d.m.Y');
+            $protocolNumber = $cd->number;
+        }
+        $protocolNumberForFileName = preg_replace('/[^a-zа-я\d.]/ui', '_', $protocolNumber);
+
+        $path = 'xlsx';
+        $resultFileName = 'vitacore-plan' . ($protocolNumber !== 0 ? '(Protokol_№'.$protocolNumberForFileName.'ot'.$protocolDate.')' : '') . '.xlsx';
+        $strDateTimeNow = date("Y-m-d-His");
+        $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+        $fullResultFilepath = Storage::path($resultFilePath);
+
+        $spreadsheet = $reportService->generate(year: $year, commissionDecisionsId: $commissionDecisionsId);
 
         $writer = new Xlsx($spreadsheet);
         $writer->save($fullResultFilepath);

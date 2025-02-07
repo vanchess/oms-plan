@@ -454,6 +454,8 @@ function vitacoreHospitalByProfilePeriodsPrintTableHeader(
 
 Route::get('/hospitalization-portal/{year}/{commissionDecisionsId?}', [PlanReports::class, "NumberOfBeds"]);
 
+Route::get('/vitacore-v3/{year}/{commissionDecisionsId?}', [PlanReports::class, "VitacorePlan"]);
+
 Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
