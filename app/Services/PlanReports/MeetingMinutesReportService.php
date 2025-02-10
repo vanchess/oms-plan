@@ -633,7 +633,7 @@ class MeetingMinutesReportService
                         $arrayData[$dataRow][++$dataCol] = $quantVal;
                         $arrayData[$dataRow][++$dataCol] = $finVal;
                         if(!$rowHasData) {
-                            if (bccomp($quantVal,'0') !== 0 || bccomp($finVal,'0')) {
+                            if (bccomp($quantVal,'0') !== 0 || bccomp($finVal,'0') !== 0) {
                                 $tableHasData = true;
                                 $rowHasData = true;
                             }

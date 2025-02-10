@@ -108,7 +108,7 @@ class PlanReports extends Controller
     }
 
     public function VitacorePlan(VitacorePlanReportService $reportService, int $year, int $commissionDecisionsId = null) {
-        $protocolNumber = 0;
+        $protocolNumber = '';
         $protocolDate = '';
         if ($commissionDecisionsId) {
             $cd = CommissionDecision::find($commissionDecisionsId);
@@ -118,7 +118,7 @@ class PlanReports extends Controller
         $protocolNumberForFileName = preg_replace('/[^a-zа-я\d.]/ui', '_', $protocolNumber);
 
         $path = 'xlsx';
-        $resultFileName = 'vitacore-plan' . ($protocolNumber !== 0 ? '(Protokol_№'.$protocolNumberForFileName.'ot'.$protocolDate.')' : '') . '.xlsx';
+        $resultFileName = 'vitacore-plan' . ($protocolNumber !== '' ? '(Protokol_№'.$protocolNumberForFileName.'ot'.$protocolDate.')' : '') . '.xlsx';
         $strDateTimeNow = date("Y-m-d-His");
         $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
         $fullResultFilepath = Storage::path($resultFilePath);

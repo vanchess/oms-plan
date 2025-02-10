@@ -3,12 +3,20 @@ declare(strict_types=1);
 
 namespace App\Services\PlanReports;
 
+use App\Models\Category;
+use App\Models\CategoryTreeNodes;
 use App\Models\ChangePackage;
 use App\Models\CommissionDecision;
+use App\Models\Indicator;
+use App\Models\IndicatorType;
+use App\Models\MedicalAssistanceType;
 use App\Models\MedicalInstitution;
 use App\Models\MedicalServices;
+use App\Models\PlannedIndicator;
 use App\Services\DataForContractService;
+use App\Services\MedicalAssistanceTypesService;
 use App\Services\MedicalServicesService;
+use App\Services\NodeService;
 use App\Services\PeopleAssignedInfoForContractService;
 use App\Services\RehabilitationProfileService;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -18,7 +26,9 @@ class VitacorePlanReportService {
     public function __construct(
         private DataForContractService $dataForContractService,
         private PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService,
-        private MedicalServicesService $medicalServicesService
+        private MedicalServicesService $medicalServicesService,
+        private NodeService $nodeService,
+        private MedicalAssistanceTypesService $medicalAssistanceTypesService
     )
     { }
 
@@ -295,6 +305,123 @@ class VitacorePlanReportService {
                     $ordinalRowNum++;
                 }
             }
+
+            ////////////////////////
+            // Поликлиника по тарифу
+            // за ИСКЛЮЧЕНИЕМ:
+            // [1,2,3,4] посещения профилактические, посещения разовые по заболеваниям, посещения неотложные, обращения по заболеваниям
+            //           Диагностические услуги
+            ////////////////////////
+
+            $typeFinId = IndicatorType::where('name', 'money')->first()->id;
+            $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+
+            $polyclinicTariffCategory = CategoryTreeNodes::Where('slug', 'polyclinic-tariff')->first();
+            $polyclinicTariffAllNodeIds = $this->nodeService->allChildrenNodeIds($polyclinicTariffCategory->id);
+            foreach($polyclinicTariffAllNodeIds as $nodeId) {
+                $node = CategoryTreeNodes::find($nodeId);
+                $category = Category::find($node->category_id);
+                // echo $category->name . '<br>';
+                $medicalAssistanceTypeIds = $this->medicalAssistanceTypesService->getIdsByNodeIdAndYear($nodeId, $year);
+                // $medicalServiceIds = $this->medicalServicesService->getIdsByNodeIdAndYear($nodeId, $year);
+                $plannedIndicatorsForNodeId = PlannedIndicator::find($this->nodeService->plannedIndicatorsForNodeId($nodeId));
+                $allIndicators = Indicator::all();
+
+                $arr['assistanceTypes'] = MedicalAssistanceType::find($medicalAssistanceTypeIds);
+                // $arr['services'] = MedicalServices::whereIn('id', $medicalServiceIds)->orderBy('order')->get();
+
+                // Данные таблицы
+                $perUnit = [];
+
+                    $hasData = false;
+                    $rowHasQuantData = false;
+                    $rowHasFinData = false;
+
+                    foreach($arr as $key => $colunms) {
+                        for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                            $perUnit[$monthNum]   =  $contentByMonth[$monthNum]['mo'][$mo->id]['polyclinic']['perUnit']['all'][$key] ?? null; //['assistanceTypes'][$assistanceTypeId][$indicatorId]
+                            if ($perUnit[$monthNum]) {
+                                $hasData = true;
+                            }
+                        }
+                        if (!$hasData) {
+                            continue;
+                        }
+                        foreach($colunms as $medicalAssistanceTypeOrService) {
+                            if ($key == 'assistanceTypes') {
+                                if (in_array($medicalAssistanceTypeOrService->id, [1,2,3,4])) {
+                                    // пропускаем посещения профилактические, посещения разовые по заболеваниям, посещения неотложные, обращения по заболеваниям
+                                    continue;
+                                }
+                            }
+                            $indicatorIds = $plannedIndicatorsForNodeId->filter(function ($value) use ($medicalAssistanceTypeOrService, $key) {
+                                if ($key == 'assistanceTypes') {
+                                    return $value->assistance_type_id === $medicalAssistanceTypeOrService->id;
+                                } else if ($key == 'services') {
+                                    return $value->service_id === $medicalAssistanceTypeOrService->id;
+                                }
+
+                            })->unique('indicator_id')->pluck('indicator_id');
+                            $indicators = $allIndicators->find($indicatorIds);
+                            $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
+                            $finIndicator = $indicators->firstWhere('type_id', $typeFinId);
+
+                            $quantVal = [];
+                            $finVal = [];
+                            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                                $quantVal[$monthNum] = $perUnit[$monthNum][$medicalAssistanceTypeOrService->id][$quantIndicator->id] ?? '0';
+                                if(!$rowHasQuantData) {
+                                    if (bccomp($quantVal[$monthNum], '0') !== 0) {
+                                        $rowHasQuantData = true;
+                                    }
+                                }
+
+                                $finVal[$monthNum] =   $perUnit[$monthNum][$medicalAssistanceTypeOrService->id][$finIndicator->id] ?? '0';
+                                if(!$rowHasFinData) {
+                                    if (bccomp($finVal[$monthNum], '0') !== 0) {
+                                        $rowHasFinData = true;
+                                    }
+                                }
+                            }
+                            $planningSectionName = \Illuminate\Support\Str::ucfirst($category->name) . '. ' . \Illuminate\Support\Str::ucfirst($medicalAssistanceTypeOrService->name);
+                            if($rowHasQuantData) {
+                                vitacoreV2PrintRow(
+                                    sheet: $sheet,
+                                    colIndex: $firstTableColIndex,
+                                    rowIndex: $firstTableDataRowIndex + $rowOffset,
+                                    ordinalRowNum: $ordinalRowNum,
+                                    moCode: $mo->code,
+                                    moName: $mo->short_name,
+                                    planningSectionName: $planningSectionName,
+                                    planningParamName: 'объемы, ' . $quantIndicator->name,
+                                    values: $quantVal
+                                );
+                                $rowOffset++;
+                                $ordinalRowNum++;
+                            }
+                            if($rowHasFinData) {
+                                vitacoreV2PrintRow(
+                                    sheet: $sheet,
+                                    colIndex: $firstTableColIndex,
+                                    rowIndex: $firstTableDataRowIndex + $rowOffset,
+                                    ordinalRowNum: $ordinalRowNum,
+                                    moCode: $mo->code,
+                                    moName: $mo->short_name,
+                                    planningSectionName: $planningSectionName,
+                                    planningParamName: 'финансовое обеспечение, руб.',
+                                    values: $finVal
+                                );
+                                $rowOffset++;
+                                $ordinalRowNum++;
+                            }
+                        }
+                    }
+
+            }
+
+            /////////////////////////////////////////
+            // end Поликлиника по тарифу
+            ////////////////////////////////////////
 
             // 4 Неотложная помощь
             $planningSectionName = "Амбулаторная помощь с неотложной целью";
