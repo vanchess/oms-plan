@@ -39,7 +39,7 @@ class PlanReports extends Controller
     }
 
 
-    public function SummaryVolume(SummaryVolumeReportService $reportService, int $year, int $commissionDecisionsId = null) {
+    public function SummaryVolume(SummaryVolumeReportService $reportService, int $year, int|null $commissionDecisionsId = null) {
         $path = 'xlsx';
         $templateFileName = 'templateSummaryVolume20241223.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
@@ -56,7 +56,7 @@ class PlanReports extends Controller
         return Storage::download($resultFilePath);
     }
 
-    public function SummaryCost (SummaryCostReportService $reportService, int $year, int $commissionDecisionsId = null) {
+    public function SummaryCost (SummaryCostReportService $reportService, int $year, int|null $commissionDecisionsId = null) {
         $path = 'xlsx';
         $templateFileName = 'templateSummaryCost20250110.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
@@ -73,7 +73,7 @@ class PlanReports extends Controller
         return Storage::download($resultFilePath);
     }
 
-    public function NumberOfBeds(NumberOfBedsReportService $numberOfBedsReportService, int $year, int $commissionDecisionsId = null) {
+    public function NumberOfBeds(NumberOfBedsReportService $numberOfBedsReportService, int $year, int|null $commissionDecisionsId = null) {
         $xml = $numberOfBedsReportService->generateXml('plan.reports.xml.numberOfBedsXml', $year, $commissionDecisionsId);
         $strDateTimeNow = date("Y-m-d-His");
         $fileneme = "{$strDateTimeNow}_numberOfBeds($year-$commissionDecisionsId).xml";
@@ -89,9 +89,9 @@ class PlanReports extends Controller
                     ]);
     }
 
-    public function PumpPgg (PumpPggReportService $reportService, int $year, int $commissionDecisionsId = null) {
+    public function PumpPgg (PumpPggReportService $reportService, int $year, int|null $commissionDecisionsId = null) {
         $path = 'xlsx' . DIRECTORY_SEPARATOR . 'pump';
-        $v = 'v7';
+        $v = '2025v1';
         $templateFileName = "PumpPgg_$v.xlsx";
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
@@ -107,7 +107,7 @@ class PlanReports extends Controller
         return Storage::download($resultFilePath);
     }
 
-    public function VitacorePlan(VitacorePlanReportService $reportService, int $year, int $commissionDecisionsId = null) {
+    public function VitacorePlan(VitacorePlanReportService $reportService, int $year, int|null $commissionDecisionsId = null) {
         $protocolNumber = '';
         $protocolDate = '';
         if ($commissionDecisionsId) {

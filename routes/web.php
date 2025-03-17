@@ -131,19 +131,78 @@ Route::get('/pump-plan', function (PumpMonitoringProfilesTreeService $treeServic
 });
 
 /**
- * Заполнить связь профилей мониторинга ПУМП и наших плановых показателей
+ * Выгрузить связь "профилей мониторинга" ПУМП и наших плановых показателей
+ *
+ */
+Route::get('/get-pump-monitoring-profiles-planned-indicators-relationships', function () {
+    $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
+    $path = 'xlsx/pump';
+    $templateFileName = 'PumpPgg2025';
+    $templateFileNameExt = '.xlsx';
+    $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName . $templateFileNameExt;
+    $templateFullFilepath = Storage::path($templateFilePath);
+
+    $spreadsheet = $reader->load($templateFullFilepath);
+    $sheet = $spreadsheet->getActiveSheet();
+    $startRow = 8;
+    $endRow = 628;
+
+    $monitoringProfileCodeCol = 2;
+    $monitoringProfileNameCol = 1;
+    $plannedIndicatorIdCol = 3;
+
+    $typeFinId = IndicatorType::where('name', 'money')->first()->id;
+    $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+
+    $num = 1;
+    for ($i = $startRow; $i <= $endRow; $i++) {
+        $name = trim($sheet->getCell([$monitoringProfileNameCol, $i])->getValue());
+        $code = trim($sheet->getCell([$monitoringProfileCodeCol, $i])->getValue());
+        $monitoringProfile = PumpMonitoringProfiles::where('code', $code)->first();
+        $monitoringProfileUnits = $monitoringProfile->profilesUnits;
+        if ($monitoringProfileUnits->count() > 2) {
+            throw new Exception("$code содержит больше 2 'частей'");
+        }
+        $plannedIndicatorIds = collect([]);
+        $plannedIndicatorNames = collect([]);
+        foreach ($monitoringProfileUnits as $mpu) {
+            $pi = $mpu->plannedIndicators;
+            $plannedIndicatorIds = $plannedIndicatorIds->concat($pi->pluck('id'));
+            $plannedIndicatorNames = $plannedIndicatorNames->concat($pi->map(function ($item, int $key) {
+                return plannedIndicatorName($item);
+            }));
+        }
+        $sheet->setCellValue([$plannedIndicatorIdCol, $i], $plannedIndicatorIds->join(','));
+        $sheet->setCellValue([$plannedIndicatorIdCol + 1, $i], $plannedIndicatorNames->join(','));
+    }
+
+
+    $resultFileName = $templateFileName . '' . $templateFileNameExt;
+    $strDateTimeNow = date("Y-m-d-His");
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $fullResultFilepath = Storage::path($resultFilePath);
+
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save($fullResultFilepath);
+    return Storage::download($resultFilePath);
+});
+
+
+/**
+ * Заполнить из файла связь профилей мониторинга ПУМП и наших плановых показателей
  */
 Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', function () {
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
     $path = 'xlsx/pump';
-    $templateFileName = 'PumpPgg2.xlsx';
+    $templateFileName = 'PumpPgg2025_IN.xlsx';
     $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
     $templateFullFilepath = Storage::path($templateFilePath);
 
     $spreadsheet = $reader->load($templateFullFilepath);
     $sheet = $spreadsheet->getActiveSheet();
     $startRow = 8;
-    $endRow = 548;
+    $endRow = 628;
 
     $monitoringProfileCodeCol = 2;
     $monitoringProfileNameCol = 1;
@@ -160,7 +219,7 @@ Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', fu
         $indicators = [];
         for ($k = 0; $k < count($indicatorsTemp); $k++) {
             $ind = trim($indicatorsTemp[$k]);
-            if ($ind !== '') {
+            if ($ind !== '' && $ind !== 'нет данных' && $ind !== 'что это?') {
                 array_push($indicators, $ind);
             }
         }
@@ -170,7 +229,8 @@ Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', fu
 
         $p = 'ERROR';
         $monitoringProfileUnits = null;
-        if (str_ends_with($name, '(сумма)')) {
+        // if (str_ends_with($name, '(сумма)')) {
+        if (str_ends_with($name, '(руб.)')) {
             $p = 'финансовая часть';
             $monitoringProfileUnits = $monitoringProfile->profilesUnits()->whereHas('unit', function (Builder $query) use ($typeFinId) {
                     $query->where('type_id', $typeFinId);
@@ -180,6 +240,9 @@ Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', fu
             $monitoringProfileUnits = $monitoringProfile->profilesUnits()->whereHas('unit', function (Builder $query) use ($typeQuantId) {
                 $query->where('type_id', $typeQuantId);
             })->get();
+        }
+        if(!$monitoringProfileUnits) {
+            throw new Exception(" $name");
         }
         foreach ($monitoringProfileUnits as $u) {
             echo $num++ . ') ' . ($t ? 'OK  ' : 'ERROR  ') . $p . ' ' . $u->unit->name . ' ' . $monitoringProfile->name . ' ' . $code . '<br>';
@@ -191,6 +254,120 @@ Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', fu
 /**/
     return 'ок';
     //phpinfo();
+});
+
+/**
+ * Коды "профилей мониторинга" 2025 изменены
+ * пробуем сопоставить показатели с новым кодом по полному имени
+ */
+Route::get('/pump-monitoring-profiles-update-codes', function () {
+    $FIN_PROFILE_TYPE_STR = "только финансовая часть";
+    $FIN_QUANT_PROFILE_TYPE_STR = "финансовая и количественная часть";
+
+    $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
+    $path = 'xlsx/pump';
+    $templateFileName = 'PumpMonitoringProfiles_v6.xlsx';
+    $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
+    $templateFullFilepath = Storage::path($templateFilePath);
+
+    $spreadsheet = $reader->load($templateFullFilepath);
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $omsProgramCol = 1;
+    // $recIdCol = 2;
+    // $parentRecIdCol = 3;
+    $monitoringProfileCodeCol = 4;
+    $monitoringProfileParentCodeCol = 5;
+    $monitoringProfileShortNameCol = 6;
+    $monitoringProfileNameCol = 7;
+    // $monitoringProfileNestingLevel = 8;
+    $parentRelationCol = 9;
+    $monitoringProfileTypeCol = 10;
+    $unitCol = 11;
+
+
+    // TODO: Получить список всех программ ОМС описанных в файле
+    $omsProgramIds =
+    [
+        OmsProgram::where('name', 'базовая')->first()->id,
+        OmsProgram::where('name', 'сверхбазовая')->first()->id
+    ];
+    $dtNow = \Carbon\Carbon::now();
+    PumpMonitoringProfiles
+        ::whereIn('oms_program_id', $omsProgramIds)
+        ->where('effective_to', '>', $dtNow)
+        ->update(['effective_to' => $dtNow]);
+
+    $iterator = $sheet->getRowIterator();
+
+    // TODO: Проверить заголовки
+
+    $iterator->next();
+    while ($iterator->valid()) {
+        $row = $iterator->current();
+        // ПрограммаОМС ИД ИДродителя Код КодРодителя КраткоеНаименование ПолноеНаименование УровеньВложенности ОтношениеКРодителю СоставПоказателя КоличественнаяЕдиница
+        $p = new PumpMonitoringProfiles();
+        $omsProgramName = trim(mb_strtolower($sheet->getCell([$omsProgramCol, $row->getRowIndex()])->getValue()));
+        if ($omsProgramName === '') {
+            break;
+        }
+        $omsProgram = OmsProgram::where('name', $omsProgramName)->first();
+        if ($omsProgram === null) {
+            throw("Программа ОМС '$omsProgramName' отсутствует в базе");
+        }
+        $p->oms_program_id = $omsProgram->id;
+        $p->code = trim($sheet->getCell([$monitoringProfileCodeCol, $row->getRowIndex()])->getValue());
+        $parentCode = trim($sheet->getCell([$monitoringProfileParentCodeCol, $row->getRowIndex()])->getValue());
+
+        if ($parentCode != '') {
+            $parent = PumpMonitoringProfiles::where('code', $parentCode)->first();
+            if ($parent !== null) {
+                $p->parent_id = $parent->id;
+            }
+        }
+        $p->short_name = trim($sheet->getCell([$monitoringProfileShortNameCol, $row->getRowIndex()])->getValue());
+        $p->name = trim($sheet->getCell([$monitoringProfileNameCol, $row->getRowIndex()])->getCalculatedValue());
+        $rT =  mb_strtolower($sheet->getCell([$parentRelationCol, $row->getRowIndex()])->getValue());
+        if ($rT != '') {
+            $relationType = PumpMonitoringProfilesRelationType::where('name', $rT)->first();
+            if ($relationType === null) {
+                throw("Неизвестный тип отношения к родителю: $rT");
+            }
+            $p->relation_type_id = $relationType->id;
+        }
+        $profileType = trim(mb_strtolower($sheet->getCell([$monitoringProfileTypeCol, $row->getRowIndex()])->getValue()));
+        $p->is_leaf = false;
+
+
+        // Ищем в базе показатель с таким полныйм именем
+        $pOld = PumpMonitoringProfiles::where('name', $p->name)->first();
+        if ($pOld !== null) {
+            if ($pOld->oms_program_id !== $p->oms_program_id
+                // || $pOld->parentCode !== $p->parentCode
+                //|| $pOld->parent_id !== $p->parent_id
+                || $pOld->short_name !== $p->short_name
+                || $pOld->name !== $p->name
+                || $pOld->relation_type_id !== $p->relation_type_id
+            ) {
+                throw new Exception("Профиль мониторинга с кодом $p->code существует и имеет значения отличные от полученных");
+            } else {
+                if ($pOld->code !== $p->code) {
+                    $byCode = PumpMonitoringProfiles::where('code', $p->code)->first();
+                    if ($byCode !== null) {
+                        $byCode->code = 'old_' . $byCode->code;
+                        $byCode->save();
+                    }
+                    $pOld->code = $p->code;
+                    $pOld->parent_id = $p->parent_id ? $p->parent_id : null;
+                    $pOld->save();
+                }
+            }
+        }
+
+        $iterator->next();
+    }
+
+    return 'ок';
 });
 
 /**
@@ -222,7 +399,7 @@ Route::get('/fill-pump-monitoring-profiles', function () {
 
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
     $path = 'xlsx/pump';
-    $templateFileName = 'PumpMonitoringProfiles_v4.xlsx';
+    $templateFileName = 'PumpMonitoringProfiles_v6.xlsx';
     $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
     $templateFullFilepath = Storage::path($templateFilePath);
 
@@ -236,9 +413,10 @@ Route::get('/fill-pump-monitoring-profiles', function () {
     $monitoringProfileParentCodeCol = 5;
     $monitoringProfileShortNameCol = 6;
     $monitoringProfileNameCol = 7;
-    $parentRelationCol = 8;
-    $monitoringProfileTypeCol = 9;
-    $unitCol = 10;
+    // $monitoringProfileNestingLevel = 8;
+    $parentRelationCol = 9;
+    $monitoringProfileTypeCol = 10;
+    $unitCol = 11;
 
 
     // TODO: Получить список всех программ ОМС описанных в файле
@@ -253,6 +431,10 @@ Route::get('/fill-pump-monitoring-profiles', function () {
         ->where('effective_to', '>', $dtNow)
         ->update(['effective_to' => $dtNow]);
 
+    // Все единицы измерения количественной части показателя
+    $quantTypeId = IndicatorType::where('name', 'volume')->first()->id;
+    $quantUnits = PumpUnit::where('type_id', $quantTypeId)->pluck('id')->toArray();
+
     $iterator = $sheet->getRowIterator();
 
     // TODO: Проверить заголовки
@@ -260,7 +442,7 @@ Route::get('/fill-pump-monitoring-profiles', function () {
     $iterator->next();
     while ($iterator->valid()) {
         $row = $iterator->current();
-        // ПрограммаОМС ИД ИДродителя Код КодРодителя КраткоеНаименование ПолноеНаименование ОтношениеКРодителю СоставПоказателя КоличественнаяЕдиница
+        // ПрограммаОМС ИД ИДродителя Код КодРодителя КраткоеНаименование ПолноеНаименование УровеньВложенности ОтношениеКРодителю СоставПоказателя КоличественнаяЕдиница
         $p = new PumpMonitoringProfiles();
         $omsProgramName = trim(mb_strtolower($sheet->getCell([$omsProgramCol, $row->getRowIndex()])->getValue()));
         if ($omsProgramName === '') {
@@ -291,6 +473,8 @@ Route::get('/fill-pump-monitoring-profiles', function () {
         $profileType = trim(mb_strtolower($sheet->getCell([$monitoringProfileTypeCol, $row->getRowIndex()])->getValue()));
         $p->is_leaf = false;
 
+
+
         // Ищем в базе показатель с таким кодом
         $pOld = PumpMonitoringProfiles::where('code', $p->code)->first();
         if ($pOld !== null) {
@@ -301,7 +485,7 @@ Route::get('/fill-pump-monitoring-profiles', function () {
                 || $pOld->name !== $p->name
                 || $pOld->relation_type_id !== $p->relation_type_id
             ) {
-                throw("Профиль мониторинга с кодом $p->code существует и имеет значения отличные от полученных");
+                throw new Exception("Профиль мониторинга с кодом $p->code существует и имеет значения отличные от полученных");
             } else {
                 // TODO
                 // Что делать если показатель вновь появился после перерыва (не использовался какой-то период)
@@ -309,6 +493,27 @@ Route::get('/fill-pump-monitoring-profiles', function () {
 
                 $pOld->effective_to = \Carbon\Carbon::create(9999, 12, 31, 23, 59, 59);
                 $pOld->save();
+
+                // Проверяем единицы измерения колличественной части показателя
+                if ($profileType === $FIN_QUANT_PROFILE_TYPE_STR) {
+                    $unitName = trim(mb_strtolower($sheet->getCell([$unitCol, $row->getRowIndex()])->getValue()));
+                    $unitId = PumpUnit::where('name', $unitName)->first()->id;
+                    $mpu = PumpMonitoringProfilesUnit::where('monitoring_profile_id', $pOld->id)
+                        ->whereIn('unit_id', $quantUnits)
+                        ->pluck('unit_id')
+                        ->toArray();
+
+                    if (count($mpu) > 1) {
+                        throw new Exception("Профиль мониторинга ($pOld->id) содержит несколько количественных показателей");
+                    }
+                    if (count($mpu) === 1) {
+                        if ($mpu[0] !== $unitId) {
+                            throw new Exception("Профиль мониторинга ($pOld->id). Количественный показатель отличается {$mpu[0]} !== $unitId");
+                        }
+                    } else {
+                        throw new Exception("Профиль мониторинга ($pOld->id). Необходимый количественный показатель отсутствует.");
+                    }
+                }
             }
         } else {
             $p->save();
@@ -319,7 +524,7 @@ Route::get('/fill-pump-monitoring-profiles', function () {
             $unit->save();
 
             if ($profileType === $FIN_QUANT_PROFILE_TYPE_STR) {
-                $unitName = $profileType = trim(mb_strtolower($sheet->getCell([$unitCol, $row->getRowIndex()])->getValue()));
+                $unitName = trim(mb_strtolower($sheet->getCell([$unitCol, $row->getRowIndex()])->getValue()));
                 $unit2 = new PumpMonitoringProfilesUnit();
                 $unit2->unit_id = PumpUnit::where('name', $unitName)->first()->id;
                 $unit2->monitoring_profile_id = $p->id;
@@ -456,7 +661,7 @@ Route::get('/hospitalization-portal/{year}/{commissionDecisionsId?}', [PlanRepor
 
 Route::get('/vitacore-v3/{year}/{commissionDecisionsId?}', [PlanReports::class, "VitacorePlan"]);
 
-Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/vitacore-v2/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int|null $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     $protocolNumber = 0;
@@ -2169,7 +2374,7 @@ function vitacoreHospitalByProfilePrintRow(
 
 }
 
-Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int|null $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     $protocolNumber = 0;
@@ -2618,7 +2823,7 @@ Route::get('/vitacore-hospital-by-profile/{year}/{commissionDecisionsId?}', func
 });
 
 
-Route::get('/vitacore-hospital-by-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/vitacore-hospital-by-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int|null $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     $protocolNumber = 0;
@@ -3191,7 +3396,7 @@ Route::get('/vitacore-hospital-by-profile-periods/{year}/{commissionDecisionsId?
     return Storage::download($resultFilePath);
 });
 
-Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/vitacore-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int|null $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     $protocolNumber = 0;
@@ -4076,7 +4281,7 @@ function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup, i
     return array_pop($bpArr);
 }
 
-Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, int $year, int|null $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     $protocolNumber = 0;
@@ -4275,7 +4480,7 @@ Route::get('/miac-hospital-by-bed-profile-periods/{year}/{commissionDecisionsId?
     return Storage::download($resultFilePath);
 });
 
-Route::get('/{year}/{commissionDecisionsId?}', function (Request $request, DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int $commissionDecisionsId = null) {
+Route::get('/{year}/{commissionDecisionsId?}', function (Request $request, DataForContractService $dataForContractService, MoInfoForContractService $moInfoForContractService, MoDepartmentsInfoForContractService $moDepartmentsInfoForContractService, PeopleAssignedInfoForContractService $peopleAssignedInfoForContractService, int $year, int|null $commissionDecisionsId = null) {
     $onlyMoModifiedByCommission = boolval($request->exists("onlyModified"));
 
     $packageIds = null;

@@ -81,7 +81,7 @@ class PumpPggReportService
                 }
 
                 $monitoringProfileUnits = null;
-                if (str_ends_with($name, '(сумма)')) {
+                if (str_ends_with($name, '(руб.)')) {
                     $monitoringProfileUnits = $monitoringProfile->profilesUnits()->whereHas('unit', function (Builder $query) use ($typeFinId) {
                             $query->where('type_id', $typeFinId);
                         })->get();
@@ -153,13 +153,13 @@ class PumpPggReportService
         $curRow = $startRow;
 
         foreach($moCollection as $mo) {
-            $sheet->setCellValue([$colMap['subjectOktmo'], $curRow], '37000');
+            $sheet->setCellValue([$colMap['subjectOktmo'], $curRow], '37000000');
             $sheet->setCellValue([$colMap['subjectName'], $curRow], 'Курганская область');
             $sheet->setCellValue([$colMap['institution'], $curRow], '');
             $sheet->setCellValue([$colMap['institutionName'], $curRow], '');
             $sheet->setCellValue([$colMap['year'], $curRow], $year);
             $sheet->setCellValue([$colMap['moCode'], $curRow], $mo->code);
-            $sheet->setCellValue([$colMap['moName'], $curRow], $mo->name);
+            $sheet->setCellValue([$colMap['moName'], $curRow], $mo->short_name);
             foreach ($colMap as $monitoringProfilesUnitId => $curCol) {
                 if (!is_int($monitoringProfilesUnitId)) {
                     continue;
@@ -171,7 +171,7 @@ class PumpPggReportService
         }
     }
 
-    public function generate(string $templateFullFilepath, int $year, int $commissionDecisionsId = null) : Spreadsheet
+    public function generate(string $templateFullFilepath, int $year, int|null $commissionDecisionsId = null) : Spreadsheet
     {
         $packageIds = null;
         $currentlyUsedDate = $year.'-01-01';
@@ -197,7 +197,7 @@ class PumpPggReportService
 
         $content = $this->dataForContractService->GetGroupedByMoAndPlannedIndicatorArray($year, $packageIds);
 
-        $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('order')->get();
+        $moCollection = MedicalInstitution::WhereRaw("? BETWEEN effective_from AND effective_to", [$currentlyUsedDate])->orderBy('code')->get();
 
         $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
         $spreadsheet = $reader->load($templateFullFilepath);

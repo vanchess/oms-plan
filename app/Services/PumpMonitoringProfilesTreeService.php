@@ -32,7 +32,7 @@ class PumpMonitoringProfilesTreeService
         return $this->plannedIndicatorIdsViaChild($mpu->monitoring_profile_id, $mpu->unit_id);
     }
 
-    private function nodeWithChildren(int $nodeId, \DateTime $dt = null)
+    private function nodeWithChildren(int $nodeId, \DateTime|null $dt = null)
     {
         $dtStr = date('Y-m-d');
         if ($dt !== null) {
