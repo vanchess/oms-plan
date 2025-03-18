@@ -91,7 +91,7 @@ class PlanReports extends Controller
 
     public function PumpPgg (PumpPggReportService $reportService, int $year, int|null $commissionDecisionsId = null) {
         $path = 'xlsx' . DIRECTORY_SEPARATOR . 'pump';
-        $v = '2025v1';
+        $v = '2025v2';
         $templateFileName = "PumpPgg_$v.xlsx";
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
