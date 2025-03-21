@@ -83,7 +83,7 @@ class SummaryVolumeReportService {
 
 
 
-    public function generate(string $templateFullFilepath, int $year, int $commissionDecisionsId = null) : Spreadsheet {
+    public function generate(string $templateFullFilepath, int $year, int|null $commissionDecisionsId = null) : Spreadsheet {
         $emptyLinesCount = 1; // количество пустых строк (под МТР)
 
         $packageIds = null;

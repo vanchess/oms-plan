@@ -32,7 +32,7 @@ class VitacorePlanReportService {
     )
     { }
 
-    public function generate(int $year, int $commissionDecisionsId = null) : Spreadsheet {
+    public function generate(int $year, int|null $commissionDecisionsId = null) : Spreadsheet {
         $packageIds = null;
         $currentlyUsedDate = $year.'-01-01';
         if ($commissionDecisionsId) {

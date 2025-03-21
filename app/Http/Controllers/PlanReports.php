@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\CommissionDecision;
+use App\Services\PlanReports\DecreeN17VmpReportService;
 use App\Services\PlanReports\MeetingMinutesReportService;
 use App\Services\PlanReports\NumberOfBedsReportService;
 use App\Services\PlanReports\SummaryCostReportService;
@@ -119,6 +120,29 @@ class PlanReports extends Controller
 
         $path = 'xlsx';
         $resultFileName = 'vitacore-plan' . ($protocolNumber !== '' ? '(Protokol_№'.$protocolNumberForFileName.'ot'.$protocolDate.')' : '') . '.xlsx';
+        $strDateTimeNow = date("Y-m-d-His");
+        $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+        $fullResultFilepath = Storage::path($resultFilePath);
+
+        $spreadsheet = $reportService->generate(year: $year, commissionDecisionsId: $commissionDecisionsId);
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($fullResultFilepath);
+        return Storage::download($resultFilePath);
+    }
+
+    public function DecreeN17Vmp(DecreeN17VmpReportService $reportService, int $year, int|null $commissionDecisionsId = null) {
+        $protocolNumber = '';
+        $protocolDate = '';
+        if ($commissionDecisionsId) {
+            $cd = CommissionDecision::find($commissionDecisionsId);
+            $protocolDate = $cd->date->format('d.m.Y');
+            $protocolNumber = $cd->number;
+        }
+        $protocolNumberForFileName = preg_replace('/[^a-zа-я\d.]/ui', '_', $protocolNumber);
+
+        $path = 'xlsx';
+        $resultFileName = 'Vmp-N17' . ($protocolNumber !== '' ? '(Protokol_№'.$protocolNumberForFileName.'ot'.$protocolDate.')' : '') . '.xlsx';
         $strDateTimeNow = date("Y-m-d-His");
         $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
         $fullResultFilepath = Storage::path($resultFilePath);

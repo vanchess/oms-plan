@@ -552,6 +552,7 @@ Route::get('/all_initial_data_loaded', function () {
 });
 
 Route::get('/meeting-minutes/{year}/{commissionDecisionsId}', [PlanReports::class, "MeetingMinutes"]);
+Route::get('/decree-n17-vmp/{year}/{commissionDecisionsId?}', [PlanReports::class, 'DecreeN17Vmp']);
 
 function vitacoreV2PrintRow(
         Worksheet $sheet,
