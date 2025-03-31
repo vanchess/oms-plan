@@ -240,14 +240,24 @@ Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', fu
     for ($i=$startRow; $i <= $endRow; $i++) {
         $name = trim($sheet->getCell([$monitoringProfileNameCol, $i])->getValue());
         $code = trim($sheet->getCell([$monitoringProfileCodeCol, $i])->getValue());
-        $indicatorsTemp = explode(',', trim($sheet->getCell([$plannedIndicatorIdCol, $i])->getValue()));
         $indicators = [];
-        for ($k = 0; $k < count($indicatorsTemp); $k++) {
-            $ind = trim($indicatorsTemp[$k]);
-            if ($ind !== '' && $ind !== 'нет данных' && $ind !== 'что это?') {
-                array_push($indicators, $ind);
+
+        // id показателей перечислены в нескольких столбцах
+        // внутри каждого столбца значения могут быть перечислены через запятую
+        $d = 0;
+        do {
+            $indicatorsRead = trim($sheet->getCell([$plannedIndicatorIdCol + $d, $i])->getValue());
+            $indicatorsTemp = explode(',', $indicatorsRead);
+            for ($k = 0; $k < count($indicatorsTemp); $k++) {
+                $ind = trim($indicatorsTemp[$k]);
+                if ($ind !== '' && $ind !== 'нет данных' && $ind !== 'что это?' && $ind !== 'не утверждается') {
+                    array_push($indicators, $ind);
+                }
             }
-        }
+            $d++;
+        } while ($indicatorsRead !== '');
+
+
         $indicators = array_unique($indicators, SORT_NUMERIC);
         $monitoringProfile = PumpMonitoringProfiles::where('code', $code)->first();
         $t = str_starts_with($name, $monitoringProfile->name);
