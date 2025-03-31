@@ -17,9 +17,10 @@ class PumpUnit extends Model
         'name',
         'type_id'
     ];
-
+/*
     public function unitType(): BelongsTo
     {
-        return $this->belongsTo(PumpUnit::class, 'unit_id', 'id');
+        return $this->belongsTo(IndicatorType::class, 'type_id', 'id');
     }
+        */
 }

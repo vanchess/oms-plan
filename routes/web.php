@@ -154,10 +154,24 @@ Route::get('/get-pump-monitoring-profiles-planned-indicators-relationships', fun
     $typeFinId = IndicatorType::where('name', 'money')->first()->id;
     $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
 
+
+
     $num = 1;
     for ($i = $startRow; $i <= $endRow; $i++) {
         $name = trim($sheet->getCell([$monitoringProfileNameCol, $i])->getValue());
         $code = trim($sheet->getCell([$monitoringProfileCodeCol, $i])->getValue());
+
+        $monitoringProfileTypeId = null;
+        // определить тип профиля мониторинга
+        if (str_ends_with($name, '(руб.)')) {
+            $monitoringProfileTypeId = $typeFinId;
+        } else if (str_ends_with($name, '(кол-во)')) {
+            $monitoringProfileTypeId = $typeQuantId;
+        }
+        if ($monitoringProfileTypeId === null) {
+            throw new Exception("Не определен тип показателя $code");
+        }
+
         $monitoringProfile = PumpMonitoringProfiles::where('code', $code)->first();
         $monitoringProfileUnits = $monitoringProfile->profilesUnits;
         if ($monitoringProfileUnits->count() > 2) {
@@ -166,14 +180,25 @@ Route::get('/get-pump-monitoring-profiles-planned-indicators-relationships', fun
         $plannedIndicatorIds = collect([]);
         $plannedIndicatorNames = collect([]);
         foreach ($monitoringProfileUnits as $mpu) {
-            $pi = $mpu->plannedIndicators;
+            if ($mpu->unit->type_id != $monitoringProfileTypeId) {
+                continue;
+            }
+
+            $pi0 = $mpu->plannedIndicators;
+
+            // Удалить показатели не соответствующие "профилю мониторинга" ПУМП по типу.
+            $pi = $pi0->filter( function (PlannedIndicator $value, int $key) use ($monitoringProfileTypeId) {
+                // dd($value->indicator);
+                return $value->indicator->type_id === $monitoringProfileTypeId;
+            });
+
             $plannedIndicatorIds = $plannedIndicatorIds->concat($pi->pluck('id'));
             $plannedIndicatorNames = $plannedIndicatorNames->concat($pi->map(function ($item, int $key) {
                 return plannedIndicatorName($item);
             }));
         }
         $sheet->setCellValue([$plannedIndicatorIdCol, $i], $plannedIndicatorIds->join(','));
-        $sheet->setCellValue([$plannedIndicatorIdCol + 1, $i], $plannedIndicatorNames->join(','));
+        $sheet->setCellValue([$plannedIndicatorIdCol + 1, $i], $plannedIndicatorNames->join(','  . PHP_EOL));
     }
 
 
