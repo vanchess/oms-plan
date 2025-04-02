@@ -250,8 +250,15 @@ Route::get('/fill-pump-monitoring-profiles-planned-indicators-relationships', fu
             $indicatorsTemp = explode(',', $indicatorsRead);
             for ($k = 0; $k < count($indicatorsTemp); $k++) {
                 $ind = trim($indicatorsTemp[$k]);
-                if ($ind !== '' && $ind !== 'нет данных' && $ind !== 'что это?' && $ind !== 'не утверждается') {
-                    array_push($indicators, $ind);
+                if ($ind !== '' && $ind !== 'нет данных' && $ind !== 'что это?' && $ind !== 'не утверждается' && $ind !== 'не нашла') {
+                    // проверяем что показатель действующий
+                    $date = date('Y-m-d');
+                    $pi = PlannedIndicator::where('id', $ind)->whereRaw("? BETWEEN effective_from AND effective_to", [$date])->get();
+                    if ($pi->count() === 1) {
+                        array_push($indicators, $ind);
+                    } else {
+                        echo "Плановый показатель $ind отсутвует на $date <br>";
+                    }
                 }
             }
             $d++;
