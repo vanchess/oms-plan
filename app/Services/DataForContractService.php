@@ -14,19 +14,19 @@ class DataForContractService
         private PeriodService $periodService
     ) {}
 
-    public function GetJson(int $year, array $packageIds = null, array $moIds = null): string {
+    public function GetJson(int $year, array|null $packageIds = null, array|null $moIds = null): string {
         return $this->CreateData($year, $packageIds, moIds:$moIds)->toJson();
     }
 
-    public function GetArray(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
+    public function GetArray(int $year, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
         return $this->CreateData($year, $packageIds, $indicatorIds)->toArray();
     }
 
-    public function GetArrayByYearAndMonth(int $year, int $monthNum, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
+    public function GetArrayByYearAndMonth(int $year, int $monthNum, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
         return $this->CreateDataByYearAndMonth($year, $monthNum, $packageIds, $indicatorIds)->toArray();
     }
 
-    private function CreateData(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
+    private function CreateData(int $year, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array|null $moIds = null) {
         $periodIds = $this->periodService->getIdsByYear($year);
         $data = $this->CreateDataByPeriodIds($periodIds, $packageIds, $indicatorIds, $moIds);
 
@@ -36,11 +36,11 @@ class DataForContractService
         ]);
     }
 
-    public function GetGroupedByMoAndPlannedIndicatorArray(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
+    public function GetGroupedByMoAndPlannedIndicatorArray(int $year, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]): array {
         return $this->CreateDataGroupedByMoAndPlannedIndicator($year, $packageIds, $indicatorIds)->toArray();
     }
 
-    private function CreateDataByYearAndMonth(int $year, int $monthNum, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]) {
+    private function CreateDataByYearAndMonth(int $year, int $monthNum, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9]) {
         $periodIds = $this->periodService->getIdsByYearAndMonth($year, $monthNum);
         $data = $this->CreateDataByPeriodIds($periodIds, $packageIds, $indicatorIds);
 
@@ -49,7 +49,7 @@ class DataForContractService
         ]);
     }
 
-    private function CreateRawData(array $periodIds, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
+    private function CreateRawData(array $periodIds, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array|null $moIds = null) {
         $dataSql = DB::table((new PlannedIndicator())->getTable().' as pi')
         ->selectRaw('SUM(value) as value, node_id, indicator_id, service_id, profile_id, assistance_type_id, care_profile_id, vmp_group_id, vmp_type_id, mo_id, planned_indicator_id, mo_department_id')
         //->leftJoin((new Indicator())->getTable().' as ind','pi.indicator_id','=','ind.id')
@@ -69,7 +69,7 @@ class DataForContractService
         return $dataSql->get();
     }
 
-    private function CreateDataGroupedByMoAndPlannedIndicator(int $year, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
+    private function CreateDataGroupedByMoAndPlannedIndicator(int $year, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array|null $moIds = null) {
         $periodIds = $this->periodService->getIdsByYear($year);
         $data = $this->CreateDataGroupedByMoAndPlannedIndicatorByPeriodIds($periodIds, $packageIds, $indicatorIds, $moIds);
 
@@ -79,13 +79,13 @@ class DataForContractService
         ]);
     }
 
-    private function CreateDataGroupedByMoAndPlannedIndicatorByPeriodIds(array $periodIds, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
+    private function CreateDataGroupedByMoAndPlannedIndicatorByPeriodIds(array $periodIds, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array|null $moIds = null) {
         $data = $this->CreateRawData($periodIds, $packageIds, $indicatorIds, $moIds);
         $data = $data->groupBy(['mo_id','planned_indicator_id']);
         return $data;
     }
 
-    private function CreateDataByPeriodIds(array $periodIds, array $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array $moIds = null) {
+    private function CreateDataByPeriodIds(array $periodIds, array|null $packageIds = null, array $indicatorIds = [2, 4, 5, 6, 7, 8, 9], array|null $moIds = null) {
 
         $hospitalNodeIds = [1,2,3,4,5,6,7];
         $hospitalDaytimeNodeIds = [2,4,5];

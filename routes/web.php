@@ -53,6 +53,9 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Csv;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
+use PhpOffice\PhpSpreadsheet\Style\Color;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -579,6 +582,74 @@ Route::get('/fill-pump-monitoring-profiles', function () {
 
     return 'ок';
 });
+
+/**
+ * Выделить ошибки выгрузки ПУМП  цветом
+ *
+ */
+Route::get('/pump-monitoring-profiles-errors-highlight-with-color', function () {
+    $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xlsx");
+    $path = 'xlsx/pump';
+    $errorsFileName = 'PumpPggErrors.txt';
+    $errorsFilePath = $path . DIRECTORY_SEPARATOR . $errorsFileName;
+    $errorsFullFilepath = Storage::path($errorsFilePath);
+
+    $templateFileName = 'PumpPgg_with_errors.xlsx';
+    $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
+    $templateFullFilepath = Storage::path($templateFilePath);
+
+    $spreadsheet = $reader->load($templateFullFilepath);
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $parsedErrors = parseErrors($errorsFullFilepath);
+    highlightErrors($sheet, $parsedErrors);
+
+    $resultFileName = $templateFileName;
+    $strDateTimeNow = date("Y-m-d-His");
+    $resultFilePath = $path . DIRECTORY_SEPARATOR . $strDateTimeNow . ' ' . $resultFileName;
+    $fullResultFilepath = Storage::path($resultFilePath);
+
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save($fullResultFilepath);
+    return Storage::download($resultFilePath);
+});
+
+/**
+ * Считать ошибки из файла
+ * Создано chatgpt )
+ */
+function parseErrors($filename) {
+    $errors = [];
+    $content = file_get_contents($filename);
+    $blocks = preg_split("/\n\s*\n/", trim($content)); // Разделение блоков по пустой строке
+
+    foreach ($blocks as $block) {
+        preg_match('/Строка:\s*(\d+)/u', $block, $lineMatch);
+        preg_match('/Столбец:\s*(\S+)/u', $block, $columnMatch);
+        $lines = explode("\n", trim($block));
+        $errorDescription = end($lines); // Последняя строка блока
+
+        if ($lineMatch && $columnMatch && $errorDescription) {
+            $errors[] = [
+                'line' => $lineMatch[1],
+                'column' => $columnMatch[1],
+                'error' => trim($errorDescription)
+            ];
+        }
+    }
+    return $errors;
+}
+/**
+ * Выделить ошибки цветом
+ * Создано chatgpt
+ */
+function highlightErrors($sheet, $errors) {
+    foreach ($errors as $error) {
+        $cell = $error['column'] . $error['line'];
+        $sheet->getStyle($cell)->getFill()->setFillType(Fill::FILL_SOLID)->setStartColor(new Color(Color::COLOR_YELLOW));
+    }
+}
 
 Route::get('/initial_changes', function () {
     InitialChanges::dispatch(2023);
@@ -2009,7 +2080,7 @@ Route::get('/summary-cost/{year}/{commissionDecisionsId?}', [PlanReports::class,
 Route::get('/pump-pgg/{year}/{commissionDecisionsId?}', [PlanReports::class, "PumpPgg"]);
 
 
-Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int $commissionDecisionsId = null) {
+Route::get('/hospital-by-profile/{year}/{commissionDecisionsId?}', function (DataForContractService $dataForContractService, PlannedIndicatorChangeInitService $plannedIndicatorChangeInitService, InitialDataFixingService $initialDataFixingService, int $year, int|null $commissionDecisionsId = null) {
     $packageIds = null;
     $currentlyUsedDate = $year.'-01-01';
     $protocolNumber = 0;
