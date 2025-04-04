@@ -115,6 +115,8 @@ class PumpPggReportService
             ->groupBy(['monitoring_profile_unit_id'])
             ->toArray();
         */
+
+        // Получаем плановые показатели соответствующие "профилю мониторинга"
         $monitoringProfilesUnitPlannedIndicators = [];
         foreach ($monitoringProfilesUnitIds as $mpuId) {
             if (!is_int($mpuId)) {
@@ -138,7 +140,9 @@ class PumpPggReportService
                     $v = '0';
                     foreach ($piIds as $piId) {
                         if (isset($moContent[$piId])) {
-                            $v = bcadd($v, ($moContent[$piId][0]->value ?? '0'));
+                            foreach ($moContent[$piId] as $mcpi) { // для каждого ФАПа (при наличии)
+                                $v = bcadd($v, ($mcpi->value ?? '0'));
+                            }
                         }
                     }
                     $contentByMonitoringProfilesUnit[$moId][$mpuId] = $v;
@@ -203,8 +207,10 @@ class PumpPggReportService
         $spreadsheet = $reader->load($templateFullFilepath);
         $sheet = $spreadsheet->getActiveSheet();
 
+        // получаем соответствие id "профиля" номеру колонки
         $colMap = $this->getColMap($sheet);
 
+        // получаем список id всех профилей присутствующих в шаблоне
         $monitoringProfilesUnitIds = array_keys($colMap);
         $monitoringProfilesUnitValuesGroupedByMo = $this->monitoringProfilesUnitValuesGroupedByMo($monitoringProfilesUnitIds, $content);
         $this->fillSheet($sheet, $colMap, $year, $monitoringProfilesUnitValuesGroupedByMo, $moCollection);
