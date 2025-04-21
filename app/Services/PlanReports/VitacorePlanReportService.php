@@ -640,7 +640,7 @@ class VitacorePlanReportService {
                 foreach ($careProfiles as $vmpGroups) {
                     foreach ($vmpGroups as $vmpTypes) {
                         foreach ($vmpTypes as $vmpT) {
-                            $values[$monthNum] = bcadd($values[$monthNum], $vmpT[$indicatorId] ?? 0);
+                            $values[$monthNum] = bcadd($values[$monthNum], $vmpT[$indicatorId] ?? '0');
                         }
                     }
                 }
