@@ -133,6 +133,14 @@ Route::get('/pump-plan', function (PumpMonitoringProfilesTreeService $treeServic
     return 'ok';
 });
 
+
+Route::get('/pump-plan-v2', function (PumpMonitoringProfilesTreeService $treeService) {
+    $tree = $treeService->nodeTree(1);
+   // dd($tree );
+    return view('pump-plan', compact('tree', 'treeService'));
+});
+
+
 /**
  * Выгрузить связь "профилей мониторинга" ПУМП и наших плановых показателей
  *
@@ -4359,7 +4367,7 @@ function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup, i
             }
         }
     }
-    /*
+    /**/
     // Красный крест
     if ($moCode === '450002') {
         if ($year > 2024) {
@@ -4368,7 +4376,7 @@ function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup, i
             }
         }
     }
-*/
+
     // пропускаем профили:
     //  19 - Кардиохирургические
     //  29 - Для беременных и рожениц
