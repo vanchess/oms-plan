@@ -10,6 +10,10 @@ use App\Http\Controllers\CategoryTreeController;
 use App\Http\Controllers\CategoryTreeNodesController;
 use App\Http\Controllers\ChangePackageController;
 use App\Http\Controllers\CommissionDecisionController;
+use App\Http\Controllers\CustomReportController;
+use App\Http\Controllers\CustomReportProfileController;
+use App\Http\Controllers\CustomReportProfileUnitController;
+use App\Http\Controllers\CustomReportUnitController;
 use App\Http\Controllers\MedicalInstitutionController;
 use App\Http\Controllers\MedicalInstitutionDepartmentController;
 use App\Http\Controllers\MedicalInstitutionIdsController;
@@ -78,6 +82,13 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('commission-decision', CommissionDecisionController::class);
         Route::apiResource('change-package', ChangePackageController::class);
         Route::get('/pump-monitoring-profiles-tree/{rootNodeId}', [PumpMonitoringProfilesTreeController::class, 'getTree']);
+        // Пользовательские отчеты
+        Route::apiResource('custom-reports', CustomReportController::class);
+        Route::apiResource('custom-report-profiles', CustomReportProfileController::class);
+        Route::apiResource('custom-report-units', CustomReportUnitController::class);
+        Route::apiResource('profile-units', CustomReportProfileUnitController::class);
+        Route::post('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'attachPlannedIndicator']);
+        Route::delete('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'detachPlannedIndicator']);
     });
 
 
