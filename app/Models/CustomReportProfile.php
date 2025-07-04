@@ -15,6 +15,11 @@ class CustomReportProfile extends Model
         'relation_type_id', 'effective_from', 'effective_to', 'order', 'user_id'
     ];
 
+    protected $casts = [
+        'effective_from' => 'datetime',
+        'effective_to' => 'datetime',
+    ];
+
     public function report()
     {
         return $this->belongsTo(CustomReport::class, 'custom_report_id');

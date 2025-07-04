@@ -22,7 +22,7 @@ class CustomReportProfile extends Migration
             $table->string('short_name',256);
             $table->foreignId('relation_type_id')->nullable();
             $table->timestamp('effective_from')->useCurrent();
-            $table->timestamp('effective_to')->default('9999-12-31 23:59:59');
+            $table->timestamp('effective_to')->default('9999-12-01 00:00:00');
             $table->integer('order')->nullable();
             $table->foreignId('user_id');
             $table->timestamps();

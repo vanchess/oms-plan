@@ -12,6 +12,7 @@ use App\Http\Controllers\ChangePackageController;
 use App\Http\Controllers\CommissionDecisionController;
 use App\Http\Controllers\CustomReportController;
 use App\Http\Controllers\CustomReportProfileController;
+use App\Http\Controllers\CustomReportProfileRelationTypeController;
 use App\Http\Controllers\CustomReportProfileUnitController;
 use App\Http\Controllers\CustomReportUnitController;
 use App\Http\Controllers\MedicalInstitutionController;
@@ -87,8 +88,10 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('custom-report-profiles', CustomReportProfileController::class);
         Route::apiResource('custom-report-units', CustomReportUnitController::class);
         Route::apiResource('profile-units', CustomReportProfileUnitController::class);
+        Route::apiResource('crp-relation-types', CustomReportProfileRelationTypeController::class);
         Route::post('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'attachPlannedIndicator']);
         Route::delete('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'detachPlannedIndicator']);
+        Route::get('custom-reports/{id}/profiles', [CustomReportController::class, 'profiles']);
     });
 
 

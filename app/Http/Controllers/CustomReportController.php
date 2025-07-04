@@ -10,7 +10,7 @@ class CustomReportController extends Controller
 {
     public function index()
     {
-        return CustomReport::with('profiles')->where('user_id', auth()->id())->get();
+        return CustomReport::with('profiles')->get();
     }
 
     public function store(Request $request)
@@ -51,5 +51,11 @@ class CustomReportController extends Controller
         $report->delete();
 
         return response()->json(['message' => 'Deleted']);
+    }
+
+    public function profiles($id)
+    {
+        $report = CustomReport::with('profiles')->findOrFail($id);
+        return response()->json($report->profiles);
     }
 }
