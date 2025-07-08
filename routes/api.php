@@ -92,6 +92,11 @@ Route::group(array('prefix' => 'v1'), function()
         Route::post('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'attachPlannedIndicator']);
         Route::delete('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'detachPlannedIndicator']);
         Route::get('custom-reports/{id}/profiles', [CustomReportController::class, 'profiles']);
+
+        Route::prefix('custom-report-profiles')->group(function () {
+            Route::get('{id}', [CustomReportProfileController::class, 'show']);
+            Route::put('{id}', [CustomReportProfileController::class, 'update']);
+        });
     });
 
 

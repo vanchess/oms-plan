@@ -8,6 +8,18 @@ use Illuminate\Http\Request;
 
 class CustomReportProfileController extends Controller
 {
+    public function show($id)
+    {
+        $profile = CustomReportProfile::with([
+            'units.unitType',
+            'units.plannedIndicators',
+            'relationType',
+            'parent',
+        ])->findOrFail($id);
+
+        return response()->json($profile);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -30,6 +42,16 @@ class CustomReportProfileController extends Controller
             'order' => 'nullable|integer'
         ]);
 
+        if (!isset($validated['order']) || is_null($validated['order'] ?? null)) {
+            $query = CustomReportProfile::where('custom_report_id', $validated['custom_report_id']);
+
+            if (!empty($validated['parent_id'])) {
+                $query->where('parent_id', $validated['parent_id']);
+            }
+
+            $maxOrder = $query->max('order') ?? 0;
+            $validated['order'] = $maxOrder + 1;
+        }
 
         if (is_null($validated['effective_from'] ?? null)) {
             unset($validated['effective_from']);
@@ -48,13 +70,11 @@ class CustomReportProfileController extends Controller
 
     public function update(Request $request, $id)
     {
-        $profile = CustomReportProfile::findOrFail($id);
-
         $validated = $request->validate([
             'name' => 'required|string|max:1024',
             'short_name' => 'required|string|max:256',
-            'code' => "required|string|max:64|unique:tbl_custom_report_profile,code,{$id}",
-            'parent_id' => 'nullable|exists:tbl_custom_report_profile,id',
+            'code' => 'required|string|max:64|unique:tbl_custom_report_profile,code,' . $id,
+            'parent_id' => 'nullable|exists:tbl_custom_report_profile,id|not_in:' . $id,
             'relation_type_id' => [
                 'nullable',
                 'exists:tbl_custom_report_profile_relation_type,id',
@@ -67,13 +87,28 @@ class CustomReportProfileController extends Controller
             'effective_from' => 'nullable|date',
             'effective_to' => 'nullable|date',
             'order' => 'nullable|integer',
+            'units' => 'array',
+            'units.*.unit_id' => 'required|exists:tbl_custom_report_unit,id',
+            'units.*.planned_indicators' => 'array',
+            'units.*.planned_indicators.*' => 'exists:tbl_planned_indicators,id',
         ]);
 
         $validated['user_id'] = auth()->id();
-
+        $profile = CustomReportProfile::findOrFail($id);
         $profile->update($validated);
 
-        return $profile;
+        // Синхронизируем единицы измерения
+        $profile->units()->sync([]);
+
+        foreach ($validated['units'] as $unitData) {
+            $profileUnit = $profile->units()->create(['unit_id' => $unitData['unit_id']]);
+
+            if (!empty($unitData['planned_indicators'])) {
+                $profileUnit->plannedIndicators()->sync($unitData['planned_indicators']);
+            }
+        }
+
+        return response()->json(['message' => 'Profile updated']);
     }
 
     public function destroy($id)
