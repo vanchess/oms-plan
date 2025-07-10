@@ -16,12 +16,24 @@ class CustomReportProfileUnitController extends Controller
             'unit_id' => 'required|exists:tbl_custom_report_unit,id',
         ]);
 
-        $existing = CustomReportProfileUnit::where($validated)->first();
+        // Включаем поиск и среди удалённых
+        $existing = CustomReportProfileUnit::withTrashed()
+            ->where('profile_id', $validated['profile_id'])
+            ->where('unit_id', $validated['unit_id'])
+            ->first();
+
         if ($existing) {
+            if ($existing->trashed()) {
+                $existing->restore(); // Восстанавливаем
+                return response()->json($existing->refresh());
+            }
+
             return response()->json(['message' => 'Связь уже существует'], 409);
         }
 
-        return CustomReportProfileUnit::create($validated);
+        $created = CustomReportProfileUnit::create($validated);
+
+        return response()->json($created);
     }
 
     public function destroy($id)
@@ -31,6 +43,12 @@ class CustomReportProfileUnitController extends Controller
         $unitLink->delete();
 
         return response()->json(['message' => 'Deleted']);
+    }
+
+    public function plannedIndicators($profileUnitId)
+    {
+        $profileUnit = CustomReportProfileUnit::with('plannedIndicators')->findOrFail($profileUnitId);
+        return response()->json(['data' => $profileUnit->plannedIndicators]);
     }
 
     public function attachPlannedIndicator(Request $request, $profileUnitId)

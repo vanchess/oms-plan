@@ -29,6 +29,6 @@ class CustomReportProfileUnit extends Model
             'tbl_custom_report_profile_unit_planned_indicator',
             'profile_unit_id',
             'planned_indicator_id'
-        );
+        )->withTimestamps();
     }
 }

@@ -11,8 +11,8 @@ class CustomReportProfileController extends Controller
     public function show($id)
     {
         $profile = CustomReportProfile::with([
-            'units.unitType',
-            'units.plannedIndicators',
+            //'units.unitType',
+            //'units.plannedIndicators',
             'relationType',
             'parent',
         ])->findOrFail($id);
@@ -87,28 +87,32 @@ class CustomReportProfileController extends Controller
             'effective_from' => 'nullable|date',
             'effective_to' => 'nullable|date',
             'order' => 'nullable|integer',
-            'units' => 'array',
-            'units.*.unit_id' => 'required|exists:tbl_custom_report_unit,id',
-            'units.*.planned_indicators' => 'array',
-            'units.*.planned_indicators.*' => 'exists:tbl_planned_indicators,id',
         ]);
 
         $validated['user_id'] = auth()->id();
+
         $profile = CustomReportProfile::findOrFail($id);
         $profile->update($validated);
 
-        // Синхронизируем единицы измерения
-        $profile->units()->sync([]);
-
-        foreach ($validated['units'] as $unitData) {
-            $profileUnit = $profile->units()->create(['unit_id' => $unitData['unit_id']]);
-
-            if (!empty($unitData['planned_indicators'])) {
-                $profileUnit->plannedIndicators()->sync($unitData['planned_indicators']);
-            }
-        }
-
         return response()->json(['message' => 'Profile updated']);
+    }
+
+    public function units($id)
+    {
+        $profile = CustomReportProfile::with('profileUnits')->findOrFail($id);
+        return response()->json($profile->profileUnits);
+    }
+
+    public function updateUnits(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'unit_ids' => 'array',
+            'unit_ids.*' => 'exists:tbl_custom_report_unit,id',
+        ]);
+
+        $profile = CustomReportProfile::findOrFail($id);
+        $profile->profileUnits()->sync($validated['unit_ids'] ?? []);
+        return response()->json(['message' => 'Units updated successfully']);
     }
 
     public function destroy($id)

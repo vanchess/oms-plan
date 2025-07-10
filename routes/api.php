@@ -89,6 +89,7 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('custom-report-units', CustomReportUnitController::class);
         Route::apiResource('profile-units', CustomReportProfileUnitController::class);
         Route::apiResource('crp-relation-types', CustomReportProfileRelationTypeController::class);
+        Route::get('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'plannedIndicators']);
         Route::post('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'attachPlannedIndicator']);
         Route::delete('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'detachPlannedIndicator']);
         Route::get('custom-reports/{id}/profiles', [CustomReportController::class, 'profiles']);

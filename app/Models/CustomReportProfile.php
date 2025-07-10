@@ -30,14 +30,9 @@ class CustomReportProfile extends Model
         return $this->belongsTo(CustomReportProfileRelationType::class, 'relation_type_id');
     }
 
-    public function units()
+    public function profileUnits()
     {
-        return $this->belongsToMany(
-            CustomReportProfileUnit::class,
-            'tbl_custom_report_profile_unit_planned_indicator',
-            'planned_indicator_id',
-            'profile_unit_id'
-        );
+        return $this->hasMany(CustomReportProfileUnit::class, 'profile_id');
     }
 
     public function parent()
