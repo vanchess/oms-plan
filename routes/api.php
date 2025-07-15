@@ -63,6 +63,7 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('medical-services', MedicalServicesController::class);
         Route::apiResource('indicators', IndicatorsController::class);
         Route::apiResource('planned-indicators', PlannedIndicatorController::class);
+        Route::get('planned-indicators/by-unit/{profileUnitId}', [PlannedIndicatorController::class, 'getByProfileUnitAndYear']);
         Route::get('/used-indicators', [UsedIndicatorsController::class, 'indicatorsUsedForNodeId']);
         Route::get('/used-hospital-bed-profiles', [UsedHospitalBedProfilesController::class, 'hospitalBedProfilesUsedForNodeId']);
         Route::get('/used-medical-assistance-types', [UsedMedicalAssistanceTypeController::class, 'medicalAssistanceTypesUsedForNodeId']);
@@ -73,7 +74,7 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('care-profiles', CareProfilesController::class);
         Route::apiResource('vmp-types', VmpTypesController::class);
         Route::apiResource('vmp-groups', VmpGroupController::class);
-        Route::get('/node/{nodeId}/cildren', [CategoryTreeController::class, 'nodeWithChildren']);
+        Route::get('/node/{nodeId}/children', [CategoryTreeController::class, 'nodeWithChildren']);
         Route::get('/category-tree/{rootNodeId}', [CategoryTreeController::class, 'getCategoryTree']);
         Route::apiResource('category-tree-nodes', CategoryTreeNodesController::class);
         Route::apiResource('categories', CategoryController::class);
@@ -91,7 +92,7 @@ Route::group(array('prefix' => 'v1'), function()
         Route::apiResource('crp-relation-types', CustomReportProfileRelationTypeController::class);
         Route::get('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'plannedIndicators']);
         Route::post('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'attachPlannedIndicator']);
-        Route::delete('/profile-units/{profileUnit}/planned-indicators', [CustomReportProfileUnitController::class, 'detachPlannedIndicator']);
+        Route::delete('/profile-units/{profileUnit}/planned-indicators/{plannedIndicatorId}', [CustomReportProfileUnitController::class, 'detachPlannedIndicator'])->where(['plannedIndicatorId' => '[0-9]+']);
         Route::get('custom-reports/{id}/profiles', [CustomReportController::class, 'profiles']);
 
         Route::prefix('custom-report-profiles')->group(function () {

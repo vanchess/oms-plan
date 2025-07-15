@@ -6,6 +6,8 @@ use App\Models\PlannedIndicator;
 use Illuminate\Http\Request;
 
 use App\Http\Resources\PlannedIndicatorCollection;
+use App\Models\CustomReportProfileUnit;
+use App\Models\CustomReportUnit;
 use Illuminate\Support\Facades\Validator;
 
 class PlannedIndicatorController extends Controller
@@ -31,6 +33,38 @@ class PlannedIndicatorController extends Controller
         }
 
         return new PlannedIndicatorCollection(PlannedIndicator::WhereRaw("? BETWEEN effective_from AND effective_to", [$date])->get());
+    }
+
+    public function getByProfileUnitAndYear(Request $request, $profileUnitId)
+    {
+        $validated = $request->validate([
+            'year' => 'required|integer|min:2020|max:2099'
+        ]);
+        $date = date('Y-m-d');
+        if (isset($validated['year'])) {
+            $date = ($validated['year'].'-01-02');
+        }
+        $profileUnit = CustomReportProfileUnit::with('unit')->findOrFail($profileUnitId);
+        $typeId = $profileUnit->unit->type_id;
+
+
+        $indicators = PlannedIndicator::with(['indicator', 'careProfile', 'assistanceType', 'service',
+        'bedProfile', 'vmpGroup', 'vmpType'])
+            ->whereHas('indicator', function ($q) use ($typeId) {
+                $q->where('type_id', $typeId);
+            })
+            ->whereRaw("? BETWEEN effective_from AND effective_to", [$date])
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'node_id' => $item->node_id,
+                    'name' => $item->indicator->name ?? 'Без названия',
+                    'description' => $item->description,
+                ];
+            });
+
+        return response()->json(['data' => $indicators]);
     }
 
     /**

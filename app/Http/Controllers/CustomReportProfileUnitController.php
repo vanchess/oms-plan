@@ -65,15 +65,12 @@ class CustomReportProfileUnitController extends Controller
         return response()->json(['message' => 'Индикатор успешно привязан']);
     }
 
-    public function detachPlannedIndicator(Request $request, $profileUnitId)
+    public function detachPlannedIndicator(Request $request, $profileUnitId, $plannedIndicatorId)
     {
-        $validated = $request->validate([
-            'planned_indicator_id' => 'required|exists:tbl_planned_indicators,id',
-        ]);
 
         $profileUnit = CustomReportProfileUnit::findOrFail($profileUnitId);
 
-        $profileUnit->plannedIndicators()->detach($validated['planned_indicator_id']);
+        $profileUnit->plannedIndicators()->detach($plannedIndicatorId);
 
         return response()->json(['message' => 'Индикатор успешно отвязан']);
     }

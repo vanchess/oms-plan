@@ -68,4 +68,39 @@ class PlannedIndicator extends Model
     {
         return $this->belongsTo(VmpTypes::class, 'vmp_type_id', 'id');
     }
+
+    public function getDescriptionAttribute()
+    {
+        $parts = [];
+
+        if ($this->indicator) {
+            $parts[] = "{$this->indicator->name}";
+        }
+
+        if ($this->careProfile) {
+            $parts[] = "Профиль МП: {$this->careProfile->name}";
+        }
+
+        if ($this->assistanceType) {
+            $parts[] = "Помощь: {$this->assistanceType->name}";
+        }
+
+        if ($this->service) {
+            $parts[] = "Услуга: {$this->service->name}";
+        }
+
+        if ($this->bedProfile) {
+            $parts[] = "Койка: {$this->bedProfile->name}";
+        }
+
+        if ($this->vmpGroup) {
+            $parts[] = "ВМП группа: {$this->vmpGroup->code}";
+        }
+
+        if ($this->vmpType) {
+            $parts[] = "ВМП тип: {$this->vmpType->name}";
+        }
+
+        return implode(' • ', $parts);
+    }
 }
