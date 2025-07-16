@@ -59,6 +59,12 @@ class PlannedIndicatorController extends Controller
                 return [
                     'id' => $item->id,
                     'node_id' => $item->node_id,
+                    'indicator_id' => $item->indicator_id,
+                    'care_profile_id' => $item->care_profile_id,
+                    'assistance_type_id' => $item->assistance_type_id,
+                    'profile_id' => $item->profile_id,
+                    'service_id' => $item->service_id,
+                    'vmp_group_id' => $item->vmp_group_id,
                     'name' => $item->indicator->name ?? 'Без названия',
                     'description' => $item->description,
                 ];
