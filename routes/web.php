@@ -4374,6 +4374,10 @@ function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup, i
             if ($vmpGroup === 79) {
                 return 40; // уроандрологические для детей (V020 код: 21);
             }
+
+            if ($vmpGroup === 87) {
+                return 41; // эндокринологические для детей (V020 код: 23);
+            }
         }
     }
 
