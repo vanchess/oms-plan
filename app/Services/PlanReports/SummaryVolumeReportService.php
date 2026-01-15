@@ -1681,7 +1681,807 @@ class SummaryVolumeReportService {
             $sheet->freezePane([$staticTableHeadEndCol + 1, $tableBodyStartRow]);
         }
 
-        //
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        ////   дистанционное наблюдение за состоянием здоровья пациентов с сахарным диабетом
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        //$sheetSectionNumber = 3;
+
+        $includingLabel = 'в т.ч.';
+
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial');
+        $spreadsheet->getDefaultStyle()->getFont()->setSize(12);
+
+        $sectionName = 'polyclinic';
+
+        $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+        $polyclinicTariffRemoteDiabeteCategory = CategoryTreeNodes::Where('slug', 'polyclinic-tariff-remote-diabete')->first();
+        $category = Category::find($polyclinicTariffRemoteDiabeteCategory->category_id);
+
+        $sheetName = \Illuminate\Support\Str::ucfirst($category->name);
+
+        $remoteDiabeteTypeIds = $this->nodeService->medicalAssistanceTypesForNodeId($polyclinicTariffRemoteDiabeteCategory->id);
+        $remoteDiabeteTypes = MedicalAssistanceType::find($remoteDiabeteTypeIds);
+        $indicatorIds = $this->nodeService->indicatorsUsedForNodeId($polyclinicTariffRemoteDiabeteCategory->id);
+        $indicators = Indicator::find($indicatorIds);
+        $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
+        $tableHasIncluding = $remoteDiabeteTypes->count() > 1;
+        // Данные таблицы
+        $dataRow = 0;
+        $arrayData = [];
+        $tableHasData = false;
+        foreach($moCollection as $mo) {
+            $rowHasData = false;
+            $dataCol = 0;
+            $arrayData[$dataRow] = [];
+            $arrayData[$dataRow][++$dataCol] = $dataRow + 1;
+            $arrayData[$dataRow][++$dataCol] = $mo->code;
+            $arrayData[$dataRow][++$dataCol] = $mo->short_name;
+            $assistanceTypesPerUnit = $content['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+
+            // if (!$assistanceTypesPerUnit) { continue; }
+            $tableTotalCol = ++$dataCol;
+            foreach($remoteDiabeteTypes as $t) {
+                $quantVal = $assistanceTypesPerUnit[$t->id][$quantIndicator->id] ?? '0';
+                $v = $arrayData[$dataRow][$tableTotalCol] ?? '0';
+                $arrayData[$dataRow][$tableTotalCol] = bcadd($v, $quantVal);
+
+                if($tableHasIncluding && $t->name !== 'прочее') {
+                    $arrayData[$dataRow][++$dataCol] = $quantVal;
+                }
+
+                if(!$rowHasData) {
+                    if (bccomp($quantVal,'0') !== 0) {
+                        $tableHasData = true;
+                        $rowHasData = true;
+                    }
+                }
+            }
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $assistanceTypesPerUnitByMonth = $contentByMonth[$monthNum]['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+                $c = $dataCol + $monthNum;
+                foreach($remoteDiabeteTypes as $t) {
+                    $quantVal = $assistanceTypesPerUnitByMonth[$t->id][$quantIndicator->id] ?? '0';
+                    $v = $arrayData[$dataRow][$c] ?? '0';
+                    $arrayData[$dataRow][$c] = bcadd($v, $quantVal);
+                }
+            }
+            $dataRow++;
+        }
+
+        if ($tableHasData) {
+            $sheetSubsectionNumber++;
+            $sheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+            $spreadsheet->addSheet($sheet, ++$sheetIndex);
+            $minimumDataCellWidth = 8;
+
+            $curRow = 4;
+            $curCol = 1;
+            $tableStartCol = $curCol;
+            $tableEndCol = $curCol;
+            $tableHeadStartRow = $curRow;
+            $tableHeadEndRow = $curRow;
+            $staticTableHeadStartCol = $curCol;
+            // Статическая часть заголовка таблицы
+            $sheet->setCellValue([$curCol, $curRow], '№ п/п');
+            $strwidth = mb_strwidth (' № п/п ');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth($strwidth);
+            $sheet->setCellValue([++$curCol, $curRow], 'Код МО');
+            // $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            $sheet->setCellValue([++$curCol, $curRow], 'Медицинская организация');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth(50);
+            $staticTableHeadEndCol = $curCol;
+            $sheet->setCellValue([++$curCol, $curRow], "Всего, $quantIndicator->name");
+            $tableTotalCol = $curCol;
+            $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            // "в том числе"
+            if ($tableHasIncluding) {
+                $sheet->setCellValue([++$curCol, $curRow], $includingLabel);
+                $tableIncludingSectionStartCol = $curCol;
+                $tableIncludingSectionEndCol = $curCol;
+            }
+            $curRow++;
+
+            // Динамическая часть заголовка таблицы
+            if ($tableHasIncluding) {
+                foreach($remoteDiabeteTypes as $t) {
+                    if($t->name === 'прочее') {
+                        continue;
+                    }
+
+                    $sheet->setCellValue([$curCol, $curRow], $t->name);
+                    $width = $minimumDataCellWidth;
+                    $wordArr = explode(' ', $t->name);
+                    foreach ($wordArr as $s) {
+                        $width = max($width, round(mb_strwidth ($s)) + 2);
+                    }
+
+                    $sheet->getColumnDimensionByColumn($curCol)->setWidth($width);
+                    $sheet->getRowDimension($curRow)->setRowHeight(count($wordArr) * 15);
+                    $sheet->mergeCells([$curCol, $curRow, $curCol, $curRow + 1]);
+                    $sheet->getStyle([$curCol, $curRow, $curCol, $curRow])->getAlignment()->setWrapText(true);
+                    $tableIncludingSectionEndCol = $curCol;
+                }
+            }
+            $curCol++;
+            $sheet->setCellValue([$curCol, $curRow - 1], 'в том числе поквартально');
+
+            $tablePerMonthSectionStartCol = $curCol;
+            for($qr = 1; $qr <= 4; $qr++) {
+                $c = $tablePerMonthSectionStartCol + (($qr-1) * 3);
+                $sheet->setCellValue([$c, $curRow], "$qr квартал");
+                $sheet->mergeCells([$c, $curRow, $c + 2, $curRow]);
+            }
+            $curRow++;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $sheet->setCellValue([$curCol++, $curRow], $this->months[$monthNum]);
+            }
+            $tablePerMonthSectionEndCol = $curCol - 1;
+            $tableEndCol = $tablePerMonthSectionEndCol;
+
+            $tableHeadEndRow = $curRow;
+            $curRow++;
+            $tableBodyStartRow = $curRow;
+
+            $totalRow = $tableBodyStartRow + count($arrayData) + $emptyLinesCount;
+            $tableBodyEndRow = $totalRow - 1;
+            $tableEndRow = $totalRow;
+            // Вставляем данные из массива в таблицу
+            $sheet->fromArray($arrayData, null, Coordinate::stringFromColumnIndex($tableStartCol) . $tableBodyStartRow);
+
+            // Строка итогов
+            $sheet->setCellValue([$staticTableHeadStartCol, $totalRow], 'Итого');
+            for ($c = $staticTableHeadEndCol + 1; $c <= $tableEndCol; $c++) {
+                $colStringName = Coordinate::stringFromColumnIndex($c);
+                $sheet->setCellValue([$c, $totalRow],'=sum(' . $colStringName . $tableBodyStartRow . ':' . $colStringName . $tableBodyEndRow . ')');
+            }
+            // Объдинение ячеек и выравнивание такста заголовка и итога
+            for($ci = $staticTableHeadStartCol; $ci <= $staticTableHeadEndCol + 1; $ci++) {
+                $sheet->mergeCells([$ci, $tableHeadStartRow, $ci, $tableHeadEndRow]);
+            }
+            if ($tableHasIncluding) {
+                $sheet->mergeCells([$tableIncludingSectionStartCol, $tableHeadStartRow, $tableIncludingSectionEndCol, $tableHeadStartRow]);
+            }
+            $sheet->mergeCells([$tablePerMonthSectionStartCol, $tableHeadStartRow, $tablePerMonthSectionEndCol, $tableHeadStartRow]);
+            $sheet->mergeCells([$staticTableHeadStartCol, $totalRow, $staticTableHeadEndCol, $totalRow]);
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableHeadEndRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableStartCol, $totalRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableEndCol, $totalRow])->getFont()->setBold(true);
+            // Border таблицы
+            $styleArray = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableEndRow])->applyFromArray($styleArray);
+
+            // Заголовок листа
+            $curRow = 0;
+            $curCol = 1;
+
+            $sheet->setCellValue([$tableEndCol,++$curRow], "Таблица $sheetSectionNumber.$sheetSubsectionNumber");
+            $sheet->getStyle([$tableEndCol, $curRow, $tableEndCol, $curRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            ++$curRow;
+            $titleCol = $curCol + 1;
+            $titleRow = $curRow + 1;
+            $sheet->setCellValue([$titleCol, $titleRow], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год ($category->name)");
+            $sheet->getStyle([$titleCol, $titleRow, $titleCol, $titleRow])->getFont()->setBold(true);
+            $sheet->getRowDimension($titleRow)->setRowHeight(20);
+            $sheet->freezePane([$staticTableHeadEndCol + 1, $tableBodyStartRow]);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        ////   дистанционное наблюдение за состоянием здоровья пациентов с артериальной гипертензией
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        //$sheetSectionNumber = 3;
+
+        $includingLabel = 'в т.ч.';
+
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial');
+        $spreadsheet->getDefaultStyle()->getFont()->setSize(12);
+
+        $sectionName = 'polyclinic';
+
+        $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+        $polyclinicTariffRemoteArterialHypertensionCategory = CategoryTreeNodes::Where('slug', 'polyclinic-tariff-remote-arterial-hypertension')->first();
+        $category = Category::find($polyclinicTariffRemoteArterialHypertensionCategory->category_id);
+
+        $sheetName = \Illuminate\Support\Str::ucfirst($category->name);
+
+        $remoteArterialHypertensionTypeIds = $this->nodeService->medicalAssistanceTypesForNodeId($polyclinicTariffRemoteArterialHypertensionCategory->id);
+        $remoteArterialHypertensionTypes = MedicalAssistanceType::find($remoteArterialHypertensionTypeIds);
+        $indicatorIds = $this->nodeService->indicatorsUsedForNodeId($polyclinicTariffRemoteArterialHypertensionCategory->id);
+        $indicators = Indicator::find($indicatorIds);
+        $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
+        $tableHasIncluding = $remoteArterialHypertensionTypes->count() > 1;
+        // Данные таблицы
+        $dataRow = 0;
+        $arrayData = [];
+        $tableHasData = false;
+        foreach($moCollection as $mo) {
+            $rowHasData = false;
+            $dataCol = 0;
+            $arrayData[$dataRow] = [];
+            $arrayData[$dataRow][++$dataCol] = $dataRow + 1;
+            $arrayData[$dataRow][++$dataCol] = $mo->code;
+            $arrayData[$dataRow][++$dataCol] = $mo->short_name;
+            $assistanceTypesPerUnit = $content['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+
+            // if (!$assistanceTypesPerUnit) { continue; }
+            $tableTotalCol = ++$dataCol;
+            foreach($remoteArterialHypertensionTypes as $t) {
+                $quantVal = $assistanceTypesPerUnit[$t->id][$quantIndicator->id] ?? '0';
+                $v = $arrayData[$dataRow][$tableTotalCol] ?? '0';
+                $arrayData[$dataRow][$tableTotalCol] = bcadd($v, $quantVal);
+
+                if($tableHasIncluding && $t->name !== 'прочее') {
+                    $arrayData[$dataRow][++$dataCol] = $quantVal;
+                }
+
+                if(!$rowHasData) {
+                    if (bccomp($quantVal,'0') !== 0) {
+                        $tableHasData = true;
+                        $rowHasData = true;
+                    }
+                }
+            }
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $assistanceTypesPerUnitByMonth = $contentByMonth[$monthNum]['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+                $c = $dataCol + $monthNum;
+                foreach($remoteArterialHypertensionTypes as $t) {
+                    $quantVal = $assistanceTypesPerUnitByMonth[$t->id][$quantIndicator->id] ?? '0';
+                    $v = $arrayData[$dataRow][$c] ?? '0';
+                    $arrayData[$dataRow][$c] = bcadd($v, $quantVal);
+                }
+            }
+            $dataRow++;
+        }
+
+        if ($tableHasData) {
+            $sheetSubsectionNumber++;
+            $sheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+            $spreadsheet->addSheet($sheet, ++$sheetIndex);
+            $minimumDataCellWidth = 8;
+
+            $curRow = 4;
+            $curCol = 1;
+            $tableStartCol = $curCol;
+            $tableEndCol = $curCol;
+            $tableHeadStartRow = $curRow;
+            $tableHeadEndRow = $curRow;
+            $staticTableHeadStartCol = $curCol;
+            // Статическая часть заголовка таблицы
+            $sheet->setCellValue([$curCol, $curRow], '№ п/п');
+            $strwidth = mb_strwidth (' № п/п ');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth($strwidth);
+            $sheet->setCellValue([++$curCol, $curRow], 'Код МО');
+            // $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            $sheet->setCellValue([++$curCol, $curRow], 'Медицинская организация');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth(50);
+            $staticTableHeadEndCol = $curCol;
+            $sheet->setCellValue([++$curCol, $curRow], "Всего, $quantIndicator->name");
+            $tableTotalCol = $curCol;
+            $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            // "в том числе"
+            if ($tableHasIncluding) {
+                $sheet->setCellValue([++$curCol, $curRow], $includingLabel);
+                $tableIncludingSectionStartCol = $curCol;
+                $tableIncludingSectionEndCol = $curCol;
+            }
+            $curRow++;
+
+            // Динамическая часть заголовка таблицы
+            if ($tableHasIncluding) {
+                foreach($remoteArterialHypertensionTypes as $t) {
+                    if($t->name === 'прочее') {
+                        continue;
+                    }
+
+                    $sheet->setCellValue([$curCol, $curRow], $t->name);
+                    $width = $minimumDataCellWidth;
+                    $wordArr = explode(' ', $t->name);
+                    foreach ($wordArr as $s) {
+                        $width = max($width, round(mb_strwidth ($s)) + 2);
+                    }
+
+                    $sheet->getColumnDimensionByColumn($curCol)->setWidth($width);
+                    $sheet->getRowDimension($curRow)->setRowHeight(count($wordArr) * 15);
+                    $sheet->mergeCells([$curCol, $curRow, $curCol, $curRow + 1]);
+                    $sheet->getStyle([$curCol, $curRow, $curCol, $curRow])->getAlignment()->setWrapText(true);
+                    $tableIncludingSectionEndCol = $curCol;
+                }
+            }
+            $curCol++;
+            $sheet->setCellValue([$curCol, $curRow - 1], 'в том числе поквартально');
+
+            $tablePerMonthSectionStartCol = $curCol;
+            for($qr = 1; $qr <= 4; $qr++) {
+                $c = $tablePerMonthSectionStartCol + (($qr-1) * 3);
+                $sheet->setCellValue([$c, $curRow], "$qr квартал");
+                $sheet->mergeCells([$c, $curRow, $c + 2, $curRow]);
+            }
+            $curRow++;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $sheet->setCellValue([$curCol++, $curRow], $this->months[$monthNum]);
+            }
+            $tablePerMonthSectionEndCol = $curCol - 1;
+            $tableEndCol = $tablePerMonthSectionEndCol;
+
+            $tableHeadEndRow = $curRow;
+            $curRow++;
+            $tableBodyStartRow = $curRow;
+
+            $totalRow = $tableBodyStartRow + count($arrayData) + $emptyLinesCount;
+            $tableBodyEndRow = $totalRow - 1;
+            $tableEndRow = $totalRow;
+            // Вставляем данные из массива в таблицу
+            $sheet->fromArray($arrayData, null, Coordinate::stringFromColumnIndex($tableStartCol) . $tableBodyStartRow);
+
+            // Строка итогов
+            $sheet->setCellValue([$staticTableHeadStartCol, $totalRow], 'Итого');
+            for ($c = $staticTableHeadEndCol + 1; $c <= $tableEndCol; $c++) {
+                $colStringName = Coordinate::stringFromColumnIndex($c);
+                $sheet->setCellValue([$c, $totalRow],'=sum(' . $colStringName . $tableBodyStartRow . ':' . $colStringName . $tableBodyEndRow . ')');
+            }
+            // Объдинение ячеек и выравнивание такста заголовка и итога
+            for($ci = $staticTableHeadStartCol; $ci <= $staticTableHeadEndCol + 1; $ci++) {
+                $sheet->mergeCells([$ci, $tableHeadStartRow, $ci, $tableHeadEndRow]);
+            }
+            if ($tableHasIncluding) {
+                $sheet->mergeCells([$tableIncludingSectionStartCol, $tableHeadStartRow, $tableIncludingSectionEndCol, $tableHeadStartRow]);
+            }
+            $sheet->mergeCells([$tablePerMonthSectionStartCol, $tableHeadStartRow, $tablePerMonthSectionEndCol, $tableHeadStartRow]);
+            $sheet->mergeCells([$staticTableHeadStartCol, $totalRow, $staticTableHeadEndCol, $totalRow]);
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableHeadEndRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableStartCol, $totalRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableEndCol, $totalRow])->getFont()->setBold(true);
+            // Border таблицы
+            $styleArray = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableEndRow])->applyFromArray($styleArray);
+
+            // Заголовок листа
+            $curRow = 0;
+            $curCol = 1;
+
+            $sheet->setCellValue([$tableEndCol,++$curRow], "Таблица $sheetSectionNumber.$sheetSubsectionNumber");
+            $sheet->getStyle([$tableEndCol, $curRow, $tableEndCol, $curRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            ++$curRow;
+            $titleCol = $curCol + 1;
+            $titleRow = $curRow + 1;
+            $sheet->setCellValue([$titleCol, $titleRow], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год ($category->name)");
+            $sheet->getStyle([$titleCol, $titleRow, $titleCol, $titleRow])->getFont()->setBold(true);
+            $sheet->getRowDimension($titleRow)->setRowHeight(20);
+            $sheet->freezePane([$staticTableHeadEndCol + 1, $tableBodyStartRow]);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        ////   Телемедицина Врач-Врач
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        //$sheetSectionNumber = 3;
+
+        $includingLabel = 'в т.ч.';
+
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial');
+        $spreadsheet->getDefaultStyle()->getFont()->setSize(12);
+
+        $sectionName = 'polyclinic';
+
+        $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+        $polyclinicTariffTetelemedMedCategory = CategoryTreeNodes::Where('slug', 'polyclinic-tariff-telemed-medmed')->first();
+        $category = Category::find($polyclinicTariffTetelemedMedCategory->category_id);
+
+        $sheetName = \Illuminate\Support\Str::ucfirst($category->name);
+
+        $tetelemedMedTypeIds = $this->nodeService->medicalAssistanceTypesForNodeId($polyclinicTariffTetelemedMedCategory->id);
+        $tetelemedMedTypes = MedicalAssistanceType::find($tetelemedMedTypeIds);
+        $indicatorIds = $this->nodeService->indicatorsUsedForNodeId($polyclinicTariffTetelemedMedCategory->id);
+        $indicators = Indicator::find($indicatorIds);
+        $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
+        $tableHasIncluding = $tetelemedMedTypes->count() > 1;
+        // Данные таблицы
+        $dataRow = 0;
+        $arrayData = [];
+        $tableHasData = false;
+        foreach($moCollection as $mo) {
+            $rowHasData = false;
+            $dataCol = 0;
+            $arrayData[$dataRow] = [];
+            $arrayData[$dataRow][++$dataCol] = $dataRow + 1;
+            $arrayData[$dataRow][++$dataCol] = $mo->code;
+            $arrayData[$dataRow][++$dataCol] = $mo->short_name;
+            $assistanceTypesPerUnit = $content['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+
+            // if (!$assistanceTypesPerUnit) { continue; }
+            $tableTotalCol = ++$dataCol;
+            foreach($tetelemedMedTypes as $t) {
+                $quantVal = $assistanceTypesPerUnit[$t->id][$quantIndicator->id] ?? '0';
+                $v = $arrayData[$dataRow][$tableTotalCol] ?? '0';
+                $arrayData[$dataRow][$tableTotalCol] = bcadd($v, $quantVal);
+
+                if($tableHasIncluding && $t->name !== 'прочее') {
+                    $arrayData[$dataRow][++$dataCol] = $quantVal;
+                }
+
+                if(!$rowHasData) {
+                    if (bccomp($quantVal,'0') !== 0) {
+                        $tableHasData = true;
+                        $rowHasData = true;
+                    }
+                }
+            }
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $assistanceTypesPerUnitByMonth = $contentByMonth[$monthNum]['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+                $c = $dataCol + $monthNum;
+                foreach($tetelemedMedTypes as $t) {
+                    $quantVal = $assistanceTypesPerUnitByMonth[$t->id][$quantIndicator->id] ?? '0';
+                    $v = $arrayData[$dataRow][$c] ?? '0';
+                    $arrayData[$dataRow][$c] = bcadd($v, $quantVal);
+                }
+            }
+            $dataRow++;
+        }
+
+        if ($tableHasData) {
+            $sheetSubsectionNumber++;
+            $sheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+            $spreadsheet->addSheet($sheet, ++$sheetIndex);
+            $minimumDataCellWidth = 8;
+
+            $curRow = 4;
+            $curCol = 1;
+            $tableStartCol = $curCol;
+            $tableEndCol = $curCol;
+            $tableHeadStartRow = $curRow;
+            $tableHeadEndRow = $curRow;
+            $staticTableHeadStartCol = $curCol;
+            // Статическая часть заголовка таблицы
+            $sheet->setCellValue([$curCol, $curRow], '№ п/п');
+            $strwidth = mb_strwidth (' № п/п ');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth($strwidth);
+            $sheet->setCellValue([++$curCol, $curRow], 'Код МО');
+            // $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            $sheet->setCellValue([++$curCol, $curRow], 'Медицинская организация');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth(50);
+            $staticTableHeadEndCol = $curCol;
+            $sheet->setCellValue([++$curCol, $curRow], "Всего, $quantIndicator->name");
+            $tableTotalCol = $curCol;
+            $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            // "в том числе"
+            if ($tableHasIncluding) {
+                $sheet->setCellValue([++$curCol, $curRow], $includingLabel);
+                $tableIncludingSectionStartCol = $curCol;
+                $tableIncludingSectionEndCol = $curCol;
+            }
+            $curRow++;
+
+            // Динамическая часть заголовка таблицы
+            if ($tableHasIncluding) {
+                foreach($tetelemedMedTypes as $t) {
+                    if($t->name === 'прочее') {
+                        continue;
+                    }
+
+                    $sheet->setCellValue([$curCol, $curRow], $t->name);
+                    $width = $minimumDataCellWidth;
+                    $wordArr = explode(' ', $t->name);
+                    foreach ($wordArr as $s) {
+                        $width = max($width, round(mb_strwidth ($s)) + 2);
+                    }
+
+                    $sheet->getColumnDimensionByColumn($curCol)->setWidth($width);
+                    $sheet->getRowDimension($curRow)->setRowHeight(count($wordArr) * 15);
+                    $sheet->mergeCells([$curCol, $curRow, $curCol, $curRow + 1]);
+                    $sheet->getStyle([$curCol, $curRow, $curCol, $curRow])->getAlignment()->setWrapText(true);
+                    $tableIncludingSectionEndCol = $curCol;
+                }
+            }
+            $curCol++;
+            $sheet->setCellValue([$curCol, $curRow - 1], 'в том числе поквартально');
+
+            $tablePerMonthSectionStartCol = $curCol;
+            for($qr = 1; $qr <= 4; $qr++) {
+                $c = $tablePerMonthSectionStartCol + (($qr-1) * 3);
+                $sheet->setCellValue([$c, $curRow], "$qr квартал");
+                $sheet->mergeCells([$c, $curRow, $c + 2, $curRow]);
+            }
+            $curRow++;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $sheet->setCellValue([$curCol++, $curRow], $this->months[$monthNum]);
+            }
+            $tablePerMonthSectionEndCol = $curCol - 1;
+            $tableEndCol = $tablePerMonthSectionEndCol;
+
+            $tableHeadEndRow = $curRow;
+            $curRow++;
+            $tableBodyStartRow = $curRow;
+
+            $totalRow = $tableBodyStartRow + count($arrayData) + $emptyLinesCount;
+            $tableBodyEndRow = $totalRow - 1;
+            $tableEndRow = $totalRow;
+            // Вставляем данные из массива в таблицу
+            $sheet->fromArray($arrayData, null, Coordinate::stringFromColumnIndex($tableStartCol) . $tableBodyStartRow);
+
+            // Строка итогов
+            $sheet->setCellValue([$staticTableHeadStartCol, $totalRow], 'Итого');
+            for ($c = $staticTableHeadEndCol + 1; $c <= $tableEndCol; $c++) {
+                $colStringName = Coordinate::stringFromColumnIndex($c);
+                $sheet->setCellValue([$c, $totalRow],'=sum(' . $colStringName . $tableBodyStartRow . ':' . $colStringName . $tableBodyEndRow . ')');
+            }
+            // Объдинение ячеек и выравнивание такста заголовка и итога
+            for($ci = $staticTableHeadStartCol; $ci <= $staticTableHeadEndCol + 1; $ci++) {
+                $sheet->mergeCells([$ci, $tableHeadStartRow, $ci, $tableHeadEndRow]);
+            }
+            if ($tableHasIncluding) {
+                $sheet->mergeCells([$tableIncludingSectionStartCol, $tableHeadStartRow, $tableIncludingSectionEndCol, $tableHeadStartRow]);
+            }
+            $sheet->mergeCells([$tablePerMonthSectionStartCol, $tableHeadStartRow, $tablePerMonthSectionEndCol, $tableHeadStartRow]);
+            $sheet->mergeCells([$staticTableHeadStartCol, $totalRow, $staticTableHeadEndCol, $totalRow]);
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableHeadEndRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableStartCol, $totalRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableEndCol, $totalRow])->getFont()->setBold(true);
+            // Border таблицы
+            $styleArray = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableEndRow])->applyFromArray($styleArray);
+
+            // Заголовок листа
+            $curRow = 0;
+            $curCol = 1;
+
+            $sheet->setCellValue([$tableEndCol,++$curRow], "Таблица $sheetSectionNumber.$sheetSubsectionNumber");
+            $sheet->getStyle([$tableEndCol, $curRow, $tableEndCol, $curRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            ++$curRow;
+            $titleCol = $curCol + 1;
+            $titleRow = $curRow + 1;
+            $sheet->setCellValue([$titleCol, $titleRow], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год ($category->name)");
+            $sheet->getStyle([$titleCol, $titleRow, $titleCol, $titleRow])->getFont()->setBold(true);
+            $sheet->getRowDimension($titleRow)->setRowHeight(20);
+            $sheet->freezePane([$staticTableHeadEndCol + 1, $tableBodyStartRow]);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        ////   Телемедицина Врач-Пациент
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        //$sheetSectionNumber = 3;
+
+        $includingLabel = 'в т.ч.';
+
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial');
+        $spreadsheet->getDefaultStyle()->getFont()->setSize(12);
+
+        $sectionName = 'polyclinic';
+
+        $typeQuantId = IndicatorType::where('name', 'volume')->first()->id;
+        $polyclinicTariffTetelemedPatientCategory = CategoryTreeNodes::Where('slug', 'polyclinic-tariff-telemed-medpatient')->first();
+        $category = Category::find($polyclinicTariffTetelemedPatientCategory->category_id);
+
+        $sheetName = \Illuminate\Support\Str::ucfirst($category->name);
+
+        $tetelemedPatientTypeIds = $this->nodeService->medicalAssistanceTypesForNodeId($polyclinicTariffTetelemedPatientCategory->id);
+        $tetelemedPatientTypes = MedicalAssistanceType::find($tetelemedPatientTypeIds);
+        $indicatorIds = $this->nodeService->indicatorsUsedForNodeId($polyclinicTariffTetelemedPatientCategory->id);
+        $indicators = Indicator::find($indicatorIds);
+        $quantIndicator = $indicators->firstWhere('type_id', $typeQuantId);
+        $tableHasIncluding = $tetelemedPatientTypes->count() > 1;
+        // Данные таблицы
+        $dataRow = 0;
+        $arrayData = [];
+        $tableHasData = false;
+        foreach($moCollection as $mo) {
+            $rowHasData = false;
+            $dataCol = 0;
+            $arrayData[$dataRow] = [];
+            $arrayData[$dataRow][++$dataCol] = $dataRow + 1;
+            $arrayData[$dataRow][++$dataCol] = $mo->code;
+            $arrayData[$dataRow][++$dataCol] = $mo->short_name;
+            $assistanceTypesPerUnit = $content['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+
+            // if (!$assistanceTypesPerUnit) { continue; }
+            $tableTotalCol = ++$dataCol;
+            foreach($tetelemedPatientTypes as $t) {
+                $quantVal = $assistanceTypesPerUnit[$t->id][$quantIndicator->id] ?? '0';
+                $v = $arrayData[$dataRow][$tableTotalCol] ?? '0';
+                $arrayData[$dataRow][$tableTotalCol] = bcadd($v, $quantVal);
+
+                if($tableHasIncluding && $t->name !== 'прочее') {
+                    $arrayData[$dataRow][++$dataCol] = $quantVal;
+                }
+
+                if(!$rowHasData) {
+                    if (bccomp($quantVal,'0') !== 0) {
+                        $tableHasData = true;
+                        $rowHasData = true;
+                    }
+                }
+            }
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $assistanceTypesPerUnitByMonth = $contentByMonth[$monthNum]['mo'][$mo->id][$sectionName]['perUnit']['all']['assistanceTypes'] ?? null;
+                $c = $dataCol + $monthNum;
+                foreach($tetelemedPatientTypes as $t) {
+                    $quantVal = $assistanceTypesPerUnitByMonth[$t->id][$quantIndicator->id] ?? '0';
+                    $v = $arrayData[$dataRow][$c] ?? '0';
+                    $arrayData[$dataRow][$c] = bcadd($v, $quantVal);
+                }
+            }
+            $dataRow++;
+        }
+
+        if ($tableHasData) {
+            $sheetSubsectionNumber++;
+            $sheet = new \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet($spreadsheet, mb_substr("$sheetSectionNumber.$sheetSubsectionNumber $sheetName", 0, 31));
+            $spreadsheet->addSheet($sheet, ++$sheetIndex);
+            $minimumDataCellWidth = 8;
+
+            $curRow = 4;
+            $curCol = 1;
+            $tableStartCol = $curCol;
+            $tableEndCol = $curCol;
+            $tableHeadStartRow = $curRow;
+            $tableHeadEndRow = $curRow;
+            $staticTableHeadStartCol = $curCol;
+            // Статическая часть заголовка таблицы
+            $sheet->setCellValue([$curCol, $curRow], '№ п/п');
+            $strwidth = mb_strwidth (' № п/п ');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth($strwidth);
+            $sheet->setCellValue([++$curCol, $curRow], 'Код МО');
+            // $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            $sheet->setCellValue([++$curCol, $curRow], 'Медицинская организация');
+            $sheet->getColumnDimensionByColumn($curCol)->setWidth(50);
+            $staticTableHeadEndCol = $curCol;
+            $sheet->setCellValue([++$curCol, $curRow], "Всего, $quantIndicator->name");
+            $tableTotalCol = $curCol;
+            $sheet->getColumnDimensionByColumn($curCol)->setAutoSize(true);
+            // "в том числе"
+            if ($tableHasIncluding) {
+                $sheet->setCellValue([++$curCol, $curRow], $includingLabel);
+                $tableIncludingSectionStartCol = $curCol;
+                $tableIncludingSectionEndCol = $curCol;
+            }
+            $curRow++;
+
+            // Динамическая часть заголовка таблицы
+            if ($tableHasIncluding) {
+                foreach($tetelemedPatientTypes as $t) {
+                    if($t->name === 'прочее') {
+                        continue;
+                    }
+
+                    $sheet->setCellValue([$curCol, $curRow], $t->name);
+                    $width = $minimumDataCellWidth;
+                    $wordArr = explode(' ', $t->name);
+                    foreach ($wordArr as $s) {
+                        $width = max($width, round(mb_strwidth ($s)) + 2);
+                    }
+
+                    $sheet->getColumnDimensionByColumn($curCol)->setWidth($width);
+                    $sheet->getRowDimension($curRow)->setRowHeight(count($wordArr) * 15);
+                    $sheet->mergeCells([$curCol, $curRow, $curCol, $curRow + 1]);
+                    $sheet->getStyle([$curCol, $curRow, $curCol, $curRow])->getAlignment()->setWrapText(true);
+                    $tableIncludingSectionEndCol = $curCol;
+                }
+            }
+            $curCol++;
+            $sheet->setCellValue([$curCol, $curRow - 1], 'в том числе поквартально');
+
+            $tablePerMonthSectionStartCol = $curCol;
+            for($qr = 1; $qr <= 4; $qr++) {
+                $c = $tablePerMonthSectionStartCol + (($qr-1) * 3);
+                $sheet->setCellValue([$c, $curRow], "$qr квартал");
+                $sheet->mergeCells([$c, $curRow, $c + 2, $curRow]);
+            }
+            $curRow++;
+            for($monthNum = 1; $monthNum <= 12; $monthNum++) {
+                $sheet->setCellValue([$curCol++, $curRow], $this->months[$monthNum]);
+            }
+            $tablePerMonthSectionEndCol = $curCol - 1;
+            $tableEndCol = $tablePerMonthSectionEndCol;
+
+            $tableHeadEndRow = $curRow;
+            $curRow++;
+            $tableBodyStartRow = $curRow;
+
+            $totalRow = $tableBodyStartRow + count($arrayData) + $emptyLinesCount;
+            $tableBodyEndRow = $totalRow - 1;
+            $tableEndRow = $totalRow;
+            // Вставляем данные из массива в таблицу
+            $sheet->fromArray($arrayData, null, Coordinate::stringFromColumnIndex($tableStartCol) . $tableBodyStartRow);
+
+            // Строка итогов
+            $sheet->setCellValue([$staticTableHeadStartCol, $totalRow], 'Итого');
+            for ($c = $staticTableHeadEndCol + 1; $c <= $tableEndCol; $c++) {
+                $colStringName = Coordinate::stringFromColumnIndex($c);
+                $sheet->setCellValue([$c, $totalRow],'=sum(' . $colStringName . $tableBodyStartRow . ':' . $colStringName . $tableBodyEndRow . ')');
+            }
+            // Объдинение ячеек и выравнивание такста заголовка и итога
+            for($ci = $staticTableHeadStartCol; $ci <= $staticTableHeadEndCol + 1; $ci++) {
+                $sheet->mergeCells([$ci, $tableHeadStartRow, $ci, $tableHeadEndRow]);
+            }
+            if ($tableHasIncluding) {
+                $sheet->mergeCells([$tableIncludingSectionStartCol, $tableHeadStartRow, $tableIncludingSectionEndCol, $tableHeadStartRow]);
+            }
+            $sheet->mergeCells([$tablePerMonthSectionStartCol, $tableHeadStartRow, $tablePerMonthSectionEndCol, $tableHeadStartRow]);
+            $sheet->mergeCells([$staticTableHeadStartCol, $totalRow, $staticTableHeadEndCol, $totalRow]);
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableHeadEndRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableStartCol, $totalRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle([$tableStartCol, $totalRow, $tableEndCol, $totalRow])->getFont()->setBold(true);
+            // Border таблицы
+            $styleArray = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+            $sheet->getStyle([$tableStartCol, $tableHeadStartRow, $tableEndCol, $tableEndRow])->applyFromArray($styleArray);
+
+            // Заголовок листа
+            $curRow = 0;
+            $curCol = 1;
+
+            $sheet->setCellValue([$tableEndCol,++$curRow], "Таблица $sheetSectionNumber.$sheetSubsectionNumber");
+            $sheet->getStyle([$tableEndCol, $curRow, $tableEndCol, $curRow])
+                ->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            ++$curRow;
+            $titleCol = $curCol + 1;
+            $titleRow = $curRow + 1;
+            $sheet->setCellValue([$titleCol, $titleRow], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год ($category->name)");
+            $sheet->getStyle([$titleCol, $titleRow, $titleCol, $titleRow])->getFont()->setBold(true);
+            $sheet->getRowDimension($titleRow)->setRowHeight(20);
+            $sheet->freezePane([$staticTableHeadEndCol + 1, $tableBodyStartRow]);
+        }
+
+
+        ////////////////////////////////////
+        //////// Неотложная помощь
+        ////////////////////////////////////
 
         $sheet = $spreadsheet->getSheetByName('4 Неотложная помощь');
         $sheet->setCellValue([2, 3], "Плановые объемы медицинской помощи в амбулаторных условиях на $year год, неотложная помощь");
