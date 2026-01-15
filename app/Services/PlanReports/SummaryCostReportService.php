@@ -97,6 +97,9 @@ class SummaryCostReportService
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [8])); // Медицинская реабилитация
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [22])); // центры здоровья
             $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [26])); // школа для больных с хроническими заболеваниями
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [27, 28])); // Дистанционное наблюдение
+            $sheet->setCellValue([++$curCol, $rowIndex], PlanCalculatorService::polyclinicPerUnitAssistanceTypesOnlyIdsSum($content, $mo->id, $indicatorId, [29, 30])); // Консультация с применением телемедицинских технологий
+
 
             for($monthNum = 1; $monthNum <= 12; $monthNum++)
             {

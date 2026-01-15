@@ -59,7 +59,7 @@ class PlanReports extends Controller
 
     public function SummaryCost (SummaryCostReportService $reportService, int $year, int|null $commissionDecisionsId = null) {
         $path = 'xlsx';
-        $templateFileName = 'templateSummaryCost20250110.xlsx';
+        $templateFileName = 'templateSummaryCost20260115.xlsx';
         $templateFilePath = $path . DIRECTORY_SEPARATOR . $templateFileName;
         $templateFullFilepath = Storage::path($templateFilePath);
         $resultFileName = "стоимость($year-$commissionDecisionsId).xlsx";
