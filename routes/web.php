@@ -4370,12 +4370,21 @@ function vmpGetBedProfileId(int $careProfileId, string $moCode, int $vmpGroup, i
     /**/
     // Красный крест
     if ($moCode === '450002') {
-        if ($year > 2024) {
+        if ($year === 2025) {
             if ($vmpGroup === 79) {
                 return 40; // уроандрологические для детей (V020 код: 21);
             }
 
             if ($vmpGroup === 87) {
+                return 41; // эндокринологические для детей (V020 код: 23);
+            }
+        }
+        if ($year === 2026) {
+            if ($vmpGroup === 78) {
+                return 40; // уроандрологические для детей (V020 код: 21);
+            }
+
+            if ($vmpGroup === 86) {
                 return 41; // эндокринологические для детей (V020 код: 23);
             }
         }
