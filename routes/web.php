@@ -4142,6 +4142,7 @@ function getTs(string $daytimeOrRoundClock, string $hospitalSubType): int
 function getLevel(int $year, int $monthNum, int $ts, int $moId, int $bedProfileId) : string
 {
     $l1 = '1';
+    $l2 = '2';
     $l2_1 = '2.1';
     $l2_2 = '2.2';
     $l3_1 = '3.1';
@@ -4183,7 +4184,7 @@ function getLevel(int $year, int $monthNum, int $ts, int $moId, int $bedProfileI
                 case 38	/* ЧУЗ "РЖД-Медицина" г. Курган" */:
                 case 7	/* ГБУ "Курганская областная специализированная инфекционная больница" */:
                 case 51	/* ГБУ "Санаторий "Озеро Горькое" */:
-                    $lResult = $l2_1;
+                    $lResult = $l2;
                     break;
 
 
