@@ -4150,7 +4150,14 @@ function getLevel(int $year, int $monthNum, int $ts, int $moId, int $bedProfileI
 
     $lResult = "ERROR";
 
-
+    /*
+    * TS - Тип стационара.
+    * Принимает значения:
+    *     1 – круглосуточный стационар,
+    *     2 – дневной при поликлинике,
+    *     3 – стационар на дому,
+    *     4 – стационар при стационаре
+    */
     if ($ts === 2 || $ts === 4) {
         $lResult = $l1;
     } elseif ($ts === 1) {
